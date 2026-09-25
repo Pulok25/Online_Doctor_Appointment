@@ -3,6 +3,8 @@ const cors = require("cors");
 const morgan = require("morgan");
 const createError = require("http-errors");
 const { errorResponse } = require("./controller/responseController");
+const userRouter = require("./router/userRouter");
+
 
 const app = express();
 
@@ -17,6 +19,8 @@ app.get("/test", (req, res) => {
     message: "api is working successfully",
   });
 });
+
+app.use("/api/users", userRouter);
 
 // 404 handler
 app.use((req, res, next) => {

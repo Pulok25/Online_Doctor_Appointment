@@ -2,7 +2,6 @@ const { Schema, model } = require("mongoose");
 const bcrypt = require("bcrypt");
 const { defaultImagePath } = require("../secret");
 
-
 const userSchema = new Schema(
   {
     name: {
@@ -35,10 +34,22 @@ const userSchema = new Schema(
       enum: ["patient", "doctor", "admin"],
       default: "patient",
     },
-    image: { type: String, default: defaultImagePath },
-    address: { type: String, required: [true, "User address is required"] },
-    phone: { type: String, required: [true, "User phone is required"] },
-    isBanned: { type: Boolean, default: false },
+    image: {
+      type: String,
+      default: defaultImagePath,
+    },
+    address: {
+      type: String,
+      required: [true, "User address is required"],
+    },
+    phone: {
+      type: String,
+      required: [true, "User phone is required"],
+    },
+    isBanned: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

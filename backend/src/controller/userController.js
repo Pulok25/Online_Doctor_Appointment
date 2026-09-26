@@ -110,10 +110,13 @@ const activateUser = async (req, res, next) => {
 
     const user = await User.create({ name, email, password, phone, address });
 
+    const userWithoutPassword = user.toObject()
+    delete userWithoutPassword.password
+
     return successResponse(res, {
       statusCode: 201,
       message: "user was registered successfully",
-      payload: { user },
+      payload: { user: userWithoutPassword },
     });
   } catch (error) {
     next(error);

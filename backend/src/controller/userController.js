@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 const { successResponse } = require("./responseController");
 const createJSONWebToken = require("../helper/jsonwebtoken");
-const { jwtActivationKey } = require("../secret");
+const { jwtActivationKey, jwtAccessKey } = require("../secret");
 
 const getUsers = async (req, res, next) => {
   try {
@@ -123,4 +123,40 @@ const activateUser = async (req, res, next) => {
   }
 };
 
-module.exports = { getUsers, registerUser, activateUser };
+const loginUser = async (req, res, next)=>{
+  try {
+    const {email, password} = req.body
+    if(!email || !password){
+      throw createError(400, "Email and Password are required")
+    }
+    const user = await User.findOne({email}).select("+password")
+    if(!user){
+      throw createError(401, "invalid email or password")
+    }
+    if(user.isBanned){
+      throw createError(403, "this account has been banned")
+    }
+    const isPasswordMatched = await user.comparePassword(password)
+    if(!isPasswordMatched){
+      throw createError(401, "invalid email or password")
+    }
+    const accessToken = createJSONWebToken({
+      _id: user._id,
+      role: user.role
+    },
+    jwtAccessKey,
+    "15m"
+  )
+  const userWithoutPassword = user.toObject()
+  delete userWithoutPassword.password
+  return successResponse(res, {
+      statusCode: 200,
+      message: "user logged in successfully",
+      payload: { user: userWithoutPassword, accessToken },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { getUsers, registerUser, activateUser,loginUser };

@@ -6,6 +6,7 @@ const { errorResponse } = require("./controller/responseController");
 const userRouter = require("./router/userRouter");
 
 
+
 const app = express();
 
 app.use(cors({ origin: "http://localhost:5173" }));
@@ -21,6 +22,7 @@ app.get("/test", (req, res) => {
 });
 
 app.use("/api/users", userRouter);
+app.use('')
 
 // 404 handler
 app.use((req, res, next) => {

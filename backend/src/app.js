@@ -4,6 +4,7 @@ const morgan = require("morgan");
 const createError = require("http-errors");
 const { errorResponse } = require("./controller/responseController");
 const userRouter = require("./router/userRouter");
+const doctorRouter = require("./router/doctorRouter");
 
 
 
@@ -22,7 +23,7 @@ app.get("/test", (req, res) => {
 });
 
 app.use("/api/users", userRouter);
-app.use('')
+app.use('/api/doctors', doctorRouter)
 
 // 404 handler
 app.use((req, res, next) => {

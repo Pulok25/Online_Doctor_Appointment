@@ -41,7 +41,7 @@ const applyForDoctor = async (req, res, next) => {
       experienceYears,
       fee,
       bio,
-      bmdcNumber,
+      bmdcNumber: normalizedBmdc,
     });
     return successResponse(res, {
       statusCode: 201,

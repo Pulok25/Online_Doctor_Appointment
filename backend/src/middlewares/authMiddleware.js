@@ -31,4 +31,11 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
+const isDoctor = (req, res, next)=>{
+  if(req.user?.role !== "doctor"){
+    return next(createError(403, "you are not authorized as a doctor"))
+  }
+  next()
+}
+
 module.exports = { isLoggedIn, isAdmin };

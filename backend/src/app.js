@@ -5,6 +5,7 @@ const createError = require("http-errors");
 const { errorResponse } = require("./controller/responseController");
 const userRouter = require("./router/userRouter");
 const doctorRouter = require("./router/doctorRouter");
+const slotRouter = require("./router/slotRouter");
 
 
 
@@ -24,6 +25,7 @@ app.get("/test", (req, res) => {
 
 app.use("/api/users", userRouter);
 app.use('/api/doctors', doctorRouter)
+app.use("/api/slots", slotRouter)
 
 // 404 handler
 app.use((req, res, next) => {

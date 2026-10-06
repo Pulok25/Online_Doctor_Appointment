@@ -19,6 +19,7 @@ MERN stack web application for booking doctor appointments. Built as a final-yea
 - Doctor application flow: a registered patient can apply to become a doctor with specialization, qualification, experience, fee, and BMDC registration number
 - Admin: view pending doctor applications, approve or reject them
 - On approval, user role is upgraded from `patient` to `doctor`
+- SlotModel Create which can solve when `doctor` can take the appointment track the appointment
 
 ## Planned
 

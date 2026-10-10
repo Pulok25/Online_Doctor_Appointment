@@ -63,27 +63,21 @@ const getMyAppointment = async (req, res, next) => {
     next(error);
   }
 };
-const updateAppointmentStatus = async (req, res, next) => {
+const approveAppointment = async (req, res, next) => {
   try {
-    const { status } = req.body;
-    const allowed = ["confirmed", "completed", "cancelled"];
-
-    if (!allowed.includes(status)) {
-      throw CreateError(400, `status must be one of: ${allowed.join(", ")}`);
-    }
     const appointment = await appointmentModel.findById(req.params.id);
     if (!appointment) {
-      throw CreateError(404, "Appoinment not found");
+      throw CreateError(404, "appointment not found");
     }
-    if (appointment.doctor.toString() !== req.user._id) {
-      throw CreateError(403, "you can only update your own appointments");
+    if (appointment.status !== "pending") {
+      throw CreateError(409, `appointment already ${appointment.status}`);
     }
 
-    appointment.status = status;
+    appointment.status = "approved";
     await appointment.save();
     return successResponse(res, {
       statusCode: 200,
-      message: "appointments updated successfully",
+      message: "appointment approved successfully",
       payload: { appointment },
     });
   } catch (error) {
@@ -91,4 +85,38 @@ const updateAppointmentStatus = async (req, res, next) => {
   }
 };
 
-module.exports = { bookAppointment, getMyAppointment, updateAppointmentStatus };
+const updateAppointmentStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const allowed = ["completed", "cancelled"];
+
+    if (!allowed.includes(status)) {
+      throw CreateError(400, `status must be one of: ${allowed.join(", ")}`);
+    }
+    const appointment = await appointmentModel.findById(req.params.id);
+    if (!appointment) {
+      throw CreateError(404, "appointment not found");
+    }
+    if (appointment.doctor.toString() !== req.user._id) {
+      throw CreateError(403, "you can only update your own appointments");
+    }
+    if (status === "completed" && appointment.status !== "approved") {
+      throw CreateError(
+        409,
+        "appointment must be admin-approved before it can be completed",
+      );
+    }
+
+    appointment.status = status;
+    await appointment.save();
+    return successResponse(res, {
+      statusCode: 200,
+      message: "appointment updated successfully",
+      payload: { appointment },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { bookAppointment, getMyAppointment, approveAppointment, updateAppointmentStatus };

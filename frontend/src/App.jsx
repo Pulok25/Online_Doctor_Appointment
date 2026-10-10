@@ -1,7 +1,12 @@
+import { AuthProvider } from "./context/AuthContext";
+import AppRoutes from "./routes/AppRoutes";
+import Navbar from "./components/Navbar";
+
 export default function App() {
   return (
-    <div className="p-8">
-      <button className="btn btn-primary">Test Button</button>
-    </div>
-  )
+    <AuthProvider>
+      <Navbar />
+      <AppRoutes />
+    </AuthProvider>
+  );
 }

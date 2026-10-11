@@ -115,10 +115,34 @@ const rejectDoctor = async (req, res, next) => {
     next(error);
   }
 };
+const getApprovedDoctors = async (req, res, next) => {
+  try {
+    const { specialization } = req.query;
+
+    const filter = { status: "approved" };
+    if (specialization) {
+      filter.specialization = { $regex: specialization, $options: "i" };
+    }
+
+    const doctors = await DoctorProfile.find(filter).populate(
+      "user",
+      "name email phone",
+    );
+
+    return successResponse(res, {
+      statusCode: 200,
+      message: "doctors fetched successfully",
+      payload: { doctors },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   applyForDoctor,
   getApplications,
   approveDoctor,
   rejectDoctor,
+  getApprovedDoctors,
 };

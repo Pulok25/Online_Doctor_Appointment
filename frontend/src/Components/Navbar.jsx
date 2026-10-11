@@ -18,6 +18,9 @@ export default function Navbar() {
         </Link>
       </div>
       <div className="flex gap-3 items-center">
+        <Link to="/doctors" className="btn btn-sm btn-ghost">
+          Find Doctors
+        </Link>
         {!user && (
           <>
             <Link to="/login" className="btn btn-sm btn-ghost">

@@ -71,6 +71,7 @@ cd Online_Doctor_Appointment
 ```bash
 cd backend
 npm install
+npm run dev
 ```
 
 

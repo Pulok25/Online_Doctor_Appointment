@@ -73,20 +73,6 @@ cd backend
 npm install
 ```
 
-Create `backend/.env`:
-
-```env
-SERVER_PORT=3001
-MONGODB_URL=mongodb://localhost:27017/online_doctor_appointment
-JWT_ACTIVATION_KEY=replace-with-a-long-random-string
-JWT_ACCESS_KEY=replace-with-a-different-long-random-string
-```
-
-Start the server:
-
-```bash
-npm run dev
-```
 
 > **Port matters.** The backend defaults to port `3002` if `SERVER_PORT` is unset, but the frontend's Axios client is hardcoded to `http://localhost:3001/api` (`frontend/src/api/axiosInstance.js`). Set `SERVER_PORT=3001`, or change the frontend base URL to match.
 

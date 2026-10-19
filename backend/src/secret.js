@@ -7,9 +7,9 @@ const defaultImagePath = process.env.DEFAULT_USER_IMAGE_PATH || 'public/images/u
 const jwtActivationKey = process.env.JWT_ACTIVATION_KEY
 const jwtAccessKey = process.env.JWT_ACCESS_KEY
 const jwtRefreshKey = process.env.JWT_REFRESH_KEY
-
+const doctorImagePath = process.env.DOCTOR_IMAGE_PATH || "public/images/doctorImg"
 if (!jwtActivationKey || !jwtAccessKey || !jwtRefreshKey) {
   throw new Error('JWT secret keys must be defined in .env')
 }
 
-module.exports = { serverPort, mongodbURL, defaultImagePath, jwtActivationKey, jwtAccessKey, jwtRefreshKey }
+module.exports = { serverPort, mongodbURL, defaultImagePath, jwtActivationKey, jwtAccessKey, jwtRefreshKey, doctorImagePath  }

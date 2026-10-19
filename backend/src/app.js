@@ -11,11 +11,12 @@ const appointmentRouter = require("./router/appointmentRouter");
 
 
 const app = express();
-
+// middlewares
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/public", express.static("public"));
 
 app.get("/test", (req, res) => {
   res.status(200).json({

@@ -119,4 +119,97 @@ const updateAppointmentStatus = async (req, res, next) => {
   }
 };
 
-module.exports = { bookAppointment, getMyAppointment, approveAppointment, updateAppointmentStatus };
+const getAllAppointments = async (req, res, next) => {
+  try {
+    const { status } = req.query;
+    const filter = {};
+    if (status && status !== "all") {
+      filter.status = status;
+    }
+
+    const appointments = await appointmentModel
+      .find(filter)
+      .populate("patient", "name email phone")
+      .populate("doctor", "name email")
+      .populate("slot", "date startTime endTime isBooked")
+      .sort({ createdAt: -1 });
+
+    return successResponse(res, {
+      statusCode: 200,
+      message: "all appointments fetched successfully",
+      payload: { appointments },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const cancelAppointmentByAdmin = async (req, res, next) => {
+  try {
+    const appointment = await appointmentModel.findById(req.params.id);
+    if (!appointment) {
+      throw CreateError(404, "appointment not found");
+    }
+
+    appointment.status = "cancelled";
+    await appointment.save();
+
+    // Free the slot if it exists
+    if (appointment.slot) {
+      await Slot.findByIdAndUpdate(appointment.slot, { isBooked: false });
+    }
+
+    return successResponse(res, {
+      statusCode: 200,
+      message: "appointment cancelled successfully",
+      payload: { appointment },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const rescheduleAppointment = async (req, res, next) => {
+  try {
+    const { date, startTime, endTime } = req.body;
+    if (!date || !startTime || !endTime) {
+      throw CreateError(400, "date, startTime and endTime are required to reschedule slot");
+    }
+
+    const appointment = await appointmentModel.findById(req.params.id);
+    if (!appointment) {
+      throw CreateError(404, "appointment not found");
+    }
+
+    // Update the slot directly
+    const updatedSlot = await Slot.findByIdAndUpdate(
+      appointment.slot,
+      { date, startTime, endTime },
+      { new: true }
+    );
+
+    const updatedAppointment = await appointmentModel
+      .findById(appointment._id)
+      .populate("patient", "name email phone")
+      .populate("doctor", "name email")
+      .populate("slot", "date startTime endTime isBooked");
+
+    return successResponse(res, {
+      statusCode: 200,
+      message: "doctor slot and appointment rescheduled successfully",
+      payload: { appointment: updatedAppointment, slot: updatedSlot },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  bookAppointment,
+  getMyAppointment,
+  approveAppointment,
+  updateAppointmentStatus,
+  getAllAppointments,
+  cancelAppointmentByAdmin,
+  rescheduleAppointment,
+};

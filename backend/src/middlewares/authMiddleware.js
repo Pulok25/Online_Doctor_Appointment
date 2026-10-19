@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const createError = require("http-errors");
 const { jwtAccessKey } = require("../secret");
+const User = require("../models/userModel");
 
 const isLoggedIn = async (req, res, next) => {
   try {
@@ -15,6 +16,14 @@ const isLoggedIn = async (req, res, next) => {
       decoded = jwt.verify(token, jwtAccessKey);
     } catch (error) {
       throw createError(401, "access token is invalid or has expired");
+    }
+
+    const user = await User.findById(decoded._id);
+    if (!user) {
+      throw createError(401, "user no longer exists");
+    }
+    if (user.isBanned) {
+      throw createError(403, "your account has been banned by the administrator");
     }
 
     req.user = decoded; // { _id, role, iat, exp }

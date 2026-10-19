@@ -3,15 +3,20 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 const { successResponse } = require("./responseController");
 const createJSONWebToken = require("../helper/jsonwebtoken");
-const { jwtActivationKey, jwtAccessKey } = require("../secret");
+const bcrypt = require("bcrypt");
+const { jwtActivationKey, jwtAccessKey, isProd } = require("../secret");
+const { str, escapeRegex, intParam } = require("../helper/validate");
+
+// constant-time-ish login: always run a bcrypt compare, even for unknown emails
+const DUMMY_HASH = bcrypt.hashSync("dummy-password-for-timing", 10);
 
 const getUsers = async (req, res, next) => {
   try {
-    const search = req.query.search || "";
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 5;
+    const search = typeof req.query.search === "string" ? req.query.search.slice(0, 50) : "";
+    const page = intParam(req.query.page, 1, { min: 1, max: 100000 });
+    const limit = intParam(req.query.limit, 5, { min: 1, max: 50 });
 
-    const searchRegExp = new RegExp(search, "i");
+    const searchRegExp = new RegExp(escapeRegex(search), "i");
 
     const filter = {
       role: { $ne: "admin" },
@@ -52,11 +57,12 @@ const getUsers = async (req, res, next) => {
 
 const registerUser = async (req, res, next) => {
   try {
-    const { name, email, password, phone, address } = req.body;
-
-    if (!name || !email || !password || !phone || !address) {
-      throw createError(400, "all fields are required");
-    }
+    const body = req.body || {};
+    const name = str(body.name, "name", { min: 2, max: 50 });
+    const email = str(body.email, "email", { max: 254 }).toLowerCase();
+    const password = str(body.password, "password", { min: 8, max: 72 }); // bcrypt ignores bytes past 72
+    const phone = str(body.phone, "phone", { max: 20 });
+    const address = str(body.address, "address", { max: 200 });
 
     const userExists = await User.exists({ email });
     if (userExists) {
@@ -66,14 +72,22 @@ const registerUser = async (req, res, next) => {
       );
     }
 
+    // never put the plaintext password in a JWT (it is only signed, not encrypted)
+    const passwordHash = await bcrypt.hash(password, 10);
     const token = createJSONWebToken(
-      { name, email, password, phone, address },
+      { name, email, passwordHash, phone, address },
       jwtActivationKey,
       "10m"
     );
 
-    console.log("activation token:", token);
-
+    // TODO: email `token` to the user. Until SMTP exists, only expose it outside production.
+    if (isProd) {
+      return successResponse(res, {
+        statusCode: 201,
+        message: "check your email to complete registration",
+      });
+    }
+    console.log("activation token (dev only):", token);
     return successResponse(res, {
       statusCode: 201,
       message: "check your email to complete registration",
@@ -86,19 +100,17 @@ const registerUser = async (req, res, next) => {
 
 const activateUser = async (req, res, next) => {
   try {
-    const { token } = req.body;
-    if (!token) {
-      throw createError(400, "token is required");
-    }
+    const token = str((req.body || {}).token, "token", { max: 2000 });
 
     let decoded;
     try {
-      decoded = jwt.verify(token, jwtActivationKey);
+      decoded = jwt.verify(token, jwtActivationKey, { algorithms: ["HS256"] });
     } catch (error) {
       throw createError(401, "token is invalid or has expired");
     }
 
-    const { name, email, password, phone, address } = decoded;
+    const { name, email, passwordHash, phone, address } = decoded;
+    if (!passwordHash) throw createError(401, "token is invalid or has expired");
 
     const userExists = await User.exists({ email });
     if (userExists) {
@@ -108,7 +120,9 @@ const activateUser = async (req, res, next) => {
       );
     }
 
-    const user = await User.create({ name, email, password, phone, address });
+    const user = new User({ name, email, password: passwordHash, phone, address });
+    user.$locals.prehashed = true; // already bcrypt-hashed at registration
+    await user.save();
 
     const userWithoutPassword = user.toObject()
     delete userWithoutPassword.password
@@ -125,20 +139,16 @@ const activateUser = async (req, res, next) => {
 
 const loginUser = async (req, res, next)=>{
   try {
-    const {email, password} = req.body
-    if(!email || !password){
-      throw createError(400, "Email and Password are required")
-    }
-    const user = await User.findOne({email}).select("+password")
-    if(!user){
+    const body = req.body || {}
+    const email = str(body.email, "email", { max: 254 }).toLowerCase()
+    const password = str(body.password, "password", { max: 72 })
+    const user = await User.findOne({ email }).select("+password")
+    const isPasswordMatched = await bcrypt.compare(password, user ? user.password : DUMMY_HASH)
+    if(!user || !isPasswordMatched){
       throw createError(401, "invalid email or password")
     }
     if(user.isBanned){
       throw createError(403, "this account has been banned")
-    }
-    const isPasswordMatched = await user.comparePassword(password)
-    if(!isPasswordMatched){
-      throw createError(401, "invalid email or password")
     }
     const accessToken = createJSONWebToken({
       _id: user._id,

@@ -4,9 +4,11 @@ const { mongodbURL } = require("../secret");
 
 async function makeAdmin() {
   const args = process.argv.slice(2);
-  const email = args[0] || "admin@example.com";
-  const password = args[1] || "admin123456";
-  const name = args[2] || "System Admin";
+  const [email, password, name = "System Admin"] = args;
+  if (!email || !password || password.length < 12) {
+    console.error("Usage: npm run make:admin -- <email> <password (12+ chars)> [name]");
+    process.exit(1);
+  }
 
   try {
     await mongoose.connect(mongodbURL);
@@ -33,7 +35,6 @@ async function makeAdmin() {
     console.log("------------------------------------------");
     console.log(`Email:    ${email}`);
     console.log(`Role:     admin`);
-    console.log(`Password: ${password}`);
     console.log("------------------------------------------");
     console.log("You can now log in at http://localhost:5173/login with these credentials.\n");
   } catch (error) {

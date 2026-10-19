@@ -6,6 +6,7 @@ const Slot = require("../models/slotModel");
 const path = require('path');
 const { doctorImagePath } = require("../secret");
 const fs = require("fs");
+const { str, escapeRegex } = require("../helper/validate");
 
 const applyForDoctor = async (req, res, next) => {
   try {
@@ -35,7 +36,19 @@ const applyForDoctor = async (req, res, next) => {
       throw createError(409, "You have already applied ");
     }
 
-    const normalizedBmdc = bmdcNumber.trim().toUpperCase();
+    let normalizedBmdc;
+    try {
+      normalizedBmdc = str(bmdcNumber, "bmdcNumber", { max: 30 }).toUpperCase();
+      str(specialization, "specialization", { max: 100 });
+      str(qualification, "qualification", { max: 200 });
+      if (bio !== undefined) str(bio, "bio", { min: 0, max: 1000 });
+      if (!Number.isFinite(Number(experienceYears)) || !Number.isFinite(Number(fee)) || Number(fee) < 0) {
+        throw createError(400, "experienceYears and fee must be numbers");
+      }
+    } catch (e) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      throw e;
+    }
     const bmdcUsed = await DoctorProfile.exists({ bmdcNumber: normalizedBmdc });
     if (bmdcUsed) {
       if (req.file) fs.unlink(req.file.path, () => {});
@@ -68,6 +81,9 @@ const applyForDoctor = async (req, res, next) => {
 const getApplications = async (req, res, next) => {
   try {
     const status = req.query.status || "pending";
+    if (!["pending", "approved", "rejected"].includes(status)) {
+      throw createError(400, "invalid status");
+    }
 
     const applications = await DoctorProfile.find({ status }).populate(
       "user",
@@ -195,7 +211,10 @@ const getApprovedDoctors = async (req, res, next) => {
 
     const filter = { status: "approved" };
     if (specialization) {
-      filter.specialization = { $regex: specialization, $options: "i" };
+      if (typeof specialization !== "string" || specialization.length > 50) {
+        throw createError(400, "invalid specialization");
+      }
+      filter.specialization = { $regex: escapeRegex(specialization), $options: "i" };
     }
 
     const doctors = await DoctorProfile.find(filter)

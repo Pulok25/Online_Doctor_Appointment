@@ -7,7 +7,8 @@ const storage = multer.diskStorage({
     cb(null, doctorImagePath);
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${req.user._id}${path.extname(file.originalname)}`;
+    const ext = { "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/png": ".png", "image/webp": ".webp" }[file.mimetype];
+    const uniqueName = `${Date.now()}-${req.user._id}${ext}`;
     cb(null, uniqueName);
   },
 });

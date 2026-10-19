@@ -1,4 +1,5 @@
 const createError = require('http-errors')
+const { str, isObjectId } = require('../helper/validate')
 const Slot = require('../models/slotModel');
 const { successResponse } = require('./responseController');
 
@@ -10,6 +11,8 @@ const createSlot = async (req, res, next)=>{
         if(!date || !startTime || !endTime){
             throw createError(400, 'date, startTime and endTime Required')
         }
+        str(date, 'date', { max: 30 }); str(startTime, 'startTime', { max: 10 }); str(endTime, 'endTime', { max: 10 })
+        if (Number.isNaN(Date.parse(date))) throw createError(400, 'invalid date')
 
         const slot = await Slot.create({
             doctor: req.user._id,
@@ -33,6 +36,7 @@ const createSlot = async (req, res, next)=>{
 const getDoctorSlots = async (req, res, next) => {
   try {
     const doctorId = req.params.doctorId || req.user._id;
+    if (!isObjectId(String(doctorId))) throw createError(400, 'invalid doctor id');
 
     const slots = await Slot.find({ doctor: doctorId, isBooked: false }).sort({
       date: 1,
@@ -52,7 +56,7 @@ const getDoctorSlots = async (req, res, next) => {
 const updateSlot = async (req, res, next) => {
   try {
     const { date, startTime, endTime } = req.body;
-    const filter = { _id: req.params.id };
+    const filter = { _id: req.params.id, isBooked: false }; // booked slots must go through admin reschedule
 
     if (req.user.role !== "admin") {
       filter.doctor = req.user._id;
@@ -65,7 +69,7 @@ const updateSlot = async (req, res, next) => {
     );
 
     if (!slot) {
-      throw createError(404, "slot not found or unauthorized to update");
+      throw createError(404, "slot not found, already booked, or unauthorized to update");
     }
 
     return successResponse(res, {

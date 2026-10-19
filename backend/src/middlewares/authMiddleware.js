@@ -13,12 +13,12 @@ const isLoggedIn = async (req, res, next) => {
     const token = authHeader.split(" ")[1];
     let decoded;
     try {
-      decoded = jwt.verify(token, jwtAccessKey);
+      decoded = jwt.verify(token, jwtAccessKey, { algorithms: ["HS256"] });
     } catch (error) {
       throw createError(401, "access token is invalid or has expired");
     }
 
-    const user = await User.findById(decoded._id);
+    const user = await User.findById(decoded._id).select("role isBanned");
     if (!user) {
       throw createError(401, "user no longer exists");
     }
@@ -26,7 +26,8 @@ const isLoggedIn = async (req, res, next) => {
       throw createError(403, "your account has been banned by the administrator");
     }
 
-    req.user = decoded; // { _id, role, iat, exp }
+    // role comes from the DB, not the token, so demotions/bans apply immediately
+    req.user = { _id: String(user._id), role: user.role };
     next();
   } catch (error) {
     next(error);

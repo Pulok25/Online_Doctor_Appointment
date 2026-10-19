@@ -1,6 +1,7 @@
 const CreateError = require("http-errors");
 
 const Slot = require("../models/slotModel");
+const { isObjectId } = require("../helper/validate");
 const appointmentModel = require("../models/appointmentModel");
 const { successResponse } = require("./responseController");
 
@@ -8,8 +9,11 @@ const bookAppointment = async (req, res, next) => {
   try {
     const { slotId, reason } = req.body;
 
-    if (!slotId) {
-      throw CreateError(400, "slotId required");
+    if (!isObjectId(slotId)) {
+      throw CreateError(400, "valid slotId required");
+    }
+    if (reason !== undefined && (typeof reason !== "string" || reason.length > 500)) {
+      throw CreateError(400, "reason must be text up to 500 characters");
     }
     const slot = await Slot.findOneAndUpdate(
       { _id: slotId, isBooked: false },
@@ -124,6 +128,9 @@ const getAllAppointments = async (req, res, next) => {
     const { status } = req.query;
     const filter = {};
     if (status && status !== "all") {
+      if (!["pending", "approved", "completed", "cancelled"].includes(status)) {
+        throw CreateError(400, "invalid status");
+      }
       filter.status = status;
     }
 

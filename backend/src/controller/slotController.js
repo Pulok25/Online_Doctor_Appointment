@@ -49,7 +49,36 @@ const getDoctorSlots = async (req, res, next) => {
   }
 };
 
-module.exports = {createSlot, getDoctorSlots}
+const updateSlot = async (req, res, next) => {
+  try {
+    const { date, startTime, endTime } = req.body;
+    const filter = { _id: req.params.id };
+
+    if (req.user.role !== "admin") {
+      filter.doctor = req.user._id;
+    }
+
+    const slot = await Slot.findOneAndUpdate(
+      filter,
+      { ...(date && { date }), ...(startTime && { startTime }), ...(endTime && { endTime }) },
+      { new: true }
+    );
+
+    if (!slot) {
+      throw createError(404, "slot not found or unauthorized to update");
+    }
+
+    return successResponse(res, {
+      statusCode: 200,
+      message: "slot updated successfully",
+      payload: { slot },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { createSlot, getDoctorSlots, updateSlot };
 
 
 

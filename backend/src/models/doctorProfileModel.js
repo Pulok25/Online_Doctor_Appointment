@@ -45,6 +45,10 @@ const doctorProfileSchema = new Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
+    image: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );

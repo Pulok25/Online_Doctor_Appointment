@@ -204,193 +204,294 @@ const downloadPrescriptionPdf = async (req, res, next) => {
 
     doc.pipe(res);
 
-    // Top Brand Header Banner
-    doc.rect(40, 40, 515, 75).fill("#0f766e"); // teal-700
-    doc
-      .fillColor("#ffffff")
-      .fontSize(22)
-      .font(fontBold)
-      .text("DocSheba Medical Center", 55, 52);
-    doc
-      .font(fontRegular)
-      .fontSize(10)
-      .text("Official Digital Clinical Prescription & Medical Record", 55, 78);
-    doc.fontSize(11).text("e-PRESCRIPTION", 420, 58, { align: "right" });
+    // ==========================================
+    // 1. MODERN TOP HEADER DECORATIVE WAVES
+    // ==========================================
+    doc.save();
+    // Primary deep teal curve
+    doc.moveTo(0, 0)
+       .lineTo(595, 0)
+       .lineTo(595, 75)
+       .bezierCurveTo(450, 110, 250, 60, 0, 95)
+       .closePath()
+       .fill("#0f766e");
 
-    // Doctor & Patient info
-    doc.fillColor("#1e293b");
-    const docInfoY = 130;
-    doc
-      .fontSize(12)
-      .font(fontBold)
-      .text(`Dr. ${prescription.doctor.name}`, 45, docInfoY);
-    doc.fontSize(9).font(fontRegular).fillColor("#475569");
-    doc.text(
-      `${doctorProfile?.qualification || "Licensed Physician"} · ${
-        doctorProfile?.specialization || "Clinical Specialist"
-      }`,
-      45,
-      docInfoY + 16
-    );
-    if (doctorProfile?.bmdcNumber) {
-      doc.text(`BMDC Reg: ${doctorProfile.bmdcNumber}`, 45, docInfoY + 28);
-    }
+    // Lighter cyan overlay accent wave
+    doc.opacity(0.35)
+       .moveTo(0, 0)
+       .lineTo(595, 0)
+       .lineTo(595, 45)
+       .bezierCurveTo(400, 95, 180, 50, 0, 85)
+       .closePath()
+       .fill("#14b8a6");
 
-    // Patient info on right - with Name, Age, Gender, Date
-    doc
-      .fillColor("#1e293b")
-      .font(fontBold)
-      .fontSize(10)
-      .text("PATIENT INFORMATION", 310, docInfoY);
-    doc.font(fontRegular).fontSize(8.5).fillColor("#475569");
+    // Top-right soft ambient glow
+    doc.opacity(0.12)
+       .circle(550, 20, 90)
+       .fill("#5eead4");
+    doc.restore();
+
+    // ==========================================
+    // 2. CENTRAL CLINICAL WATERMARK
+    // ==========================================
+    doc.save();
+    doc.opacity(0.045);
+    const cx = 297.5;
+    const cy = 440;
+
+    // Outer emblem ring
+    doc.circle(cx, cy, 140).lineWidth(5).strokeColor("#0f766e").stroke();
+    doc.circle(cx, cy, 128).lineWidth(1.5).stroke();
+
+    // Medical Caduceus Cross
+    const crossW = 28, crossH = 80;
+    doc.rect(cx - crossW / 2, cy - crossH / 2, crossW, crossH).fill("#0f766e");
+    doc.rect(cx - crossH / 2, cy - crossW / 2, crossH, crossW).fill("#0f766e");
+
+    // Watermark Typography
+    doc.fillColor("#0f766e")
+       .font(fontBold)
+       .fontSize(32)
+       .text("DocSheba", cx - 150, cy + 95, { width: 300, align: "center" });
+    doc.fontSize(11)
+       .font(fontRegular)
+       .text("OFFICIAL CLINICAL PRESCRIPTION", cx - 150, cy + 132, { width: 300, align: "center" });
+    doc.restore();
+
+    // ==========================================
+    // 3. TOP CLINIC BRANDING IN HEADER
+    // ==========================================
+    // White logo box with teal medical cross
+    doc.roundedRect(42, 22, 34, 34, 8).fill("#ffffff");
+    doc.rect(56, 28, 6, 22).fill("#0f766e");
+    doc.rect(48, 36, 22, 6).fill("#0f766e");
+
+    doc.fillColor("#ffffff")
+       .font(fontBold)
+       .fontSize(19)
+       .text("DocSheba Medical Center", 86, 22);
+
+    doc.font(fontRegular)
+       .fontSize(8.5)
+       .fillColor("#ccfbf1")
+       .text("Government & BMDC Certified Healthcare Network · Digital e-Prescription Pad", 86, 44);
+
+    // ==========================================
+    // 4. DOCTOR PROFILE & METADATA
+    // ==========================================
+    const docInfoY = 110;
+    doc.fillColor("#0f172a")
+       .font(fontBold)
+       .fontSize(14)
+       .text(`Dr. ${prescription.doctor.name}`, 42, docInfoY);
+
+    doc.font(fontRegular)
+       .fontSize(9)
+       .fillColor("#0f766e")
+       .text(
+         `${doctorProfile?.qualification || "Licensed Physician"} · ${
+           doctorProfile?.specialization || "Clinical Specialist"
+         }`,
+         42,
+         docInfoY + 18
+       );
+
+    doc.font(fontRegular)
+       .fontSize(8.5)
+       .fillColor("#64748b")
+       .text(
+         `BMDC Reg: ${doctorProfile?.bmdcNumber || "Verified"} · OPD Clinical Consultation`,
+         42,
+         docInfoY + 31
+       );
+
+    // Prescription Serial & Date on the right
+    const apptDateStr = appointment?.slot?.date
+      ? new Date(appointment.slot.date).toDateString()
+      : new Date(prescription.createdAt).toDateString();
+
+    doc.font(fontBold)
+       .fontSize(8.5)
+       .fillColor("#475569")
+       .text("Rx Serial:", 400, docInfoY, { width: 70, align: "right" });
+    doc.font(fontRegular)
+       .fontSize(8.5)
+       .fillColor("#0f172a")
+       .text(`DS-${prescription._id.toString().slice(-6).toUpperCase()}`, 475, docInfoY, { width: 80, align: "right" });
+
+    doc.font(fontBold)
+       .fontSize(8.5)
+       .fillColor("#475569")
+       .text("Date:", 400, docInfoY + 16, { width: 70, align: "right" });
+    doc.font(fontRegular)
+       .fontSize(8.5)
+       .fillColor("#0f172a")
+       .text(apptDateStr, 475, docInfoY + 16, { width: 80, align: "right" });
+
+    // ==========================================
+    // 5. PATIENT INFORMATION CARD (MODERN STRIP)
+    // ==========================================
+    const ptCardY = docInfoY + 50;
+    doc.roundedRect(42, ptCardY, 511, 46, 8)
+       .fillAndStroke("#f8fafc", "#e2e8f0");
+
     const patientDisplayName =
       prescription.patientName || prescription.patient?.name || "N/A";
     const patientDisplayAge = prescription.patientAge
       ? `${prescription.patientAge} Years`
       : "N/A";
     const patientDisplayGender = prescription.patientGender || "N/A";
-    const apptDateStr = appointment?.slot?.date
-      ? new Date(appointment.slot.date).toDateString()
-      : new Date(prescription.createdAt).toDateString();
 
-    doc.text(`Name: ${patientDisplayName}`, 310, docInfoY + 14);
-    doc.text(`Age: ${patientDisplayAge}   |   Gender: ${patientDisplayGender}`, 310, docInfoY + 26);
-    doc.text(`Date of Visit: ${apptDateStr}`, 310, docInfoY + 38);
-    if (prescription.patient?.phone) {
-      doc.text(`Contact: ${prescription.patient.phone}`, 310, docInfoY + 50);
-    }
+    // Line 1: Name & Age
+    doc.font(fontBold).fontSize(8.5).fillColor("#64748b").text("PATIENT NAME:", 54, ptCardY + 9);
+    doc.font(fontBold).fontSize(9.5).fillColor("#0f172a").text(patientDisplayName, 135, ptCardY + 9);
 
-    // Separator line
-    doc
-      .strokeColor("#cbd5e1")
-      .lineWidth(1)
-      .moveTo(40, docInfoY + 65)
-      .lineTo(555, docInfoY + 65)
-      .stroke();
+    doc.font(fontBold).fontSize(8.5).fillColor("#64748b").text("AGE / বয়স:", 380, ptCardY + 9);
+    doc.font(fontRegular).fontSize(9).fillColor("#0f172a").text(patientDisplayAge, 440, ptCardY + 9);
 
-    // Clinical Diagnosis Banner
-    const diagY = docInfoY + 75;
-    doc.rect(40, diagY, 515, 30).fill("#f0fdfa"); // teal-50
-    doc
-      .fillColor("#0f766e")
-      .font(fontBold)
-      .fontSize(11)
-      .text("DIAGNOSIS / CLINICAL FINDINGS:", 50, diagY + 9);
-    doc
-      .fillColor("#1e293b")
-      .font(fontRegular)
-      .fontSize(10)
-      .text(prescription.diagnosis, 270, diagY + 9);
+    // Line 2: Gender & Contact
+    doc.font(fontBold).fontSize(8.5).fillColor("#64748b").text("GENDER / লিঙ্গ:", 54, ptCardY + 26);
+    doc.font(fontRegular).fontSize(9).fillColor("#0f172a").text(patientDisplayGender, 135, ptCardY + 26);
 
-    // Rx Symbol & Medicines Section
-    const rxY = diagY + 45;
-    doc
-      .fillColor("#0f766e")
-      .font(fontBold)
-      .fontSize(26)
-      .text("Rx", 45, rxY);
+    doc.font(fontBold).fontSize(8.5).fillColor("#64748b").text("PHONE / মোবাইল:", 250, ptCardY + 26);
+    doc.font(fontRegular).fontSize(9).fillColor("#0f172a").text(prescription.patient?.phone || "N/A", 345, ptCardY + 26);
+
+    // ==========================================
+    // 6. CLINICAL DIAGNOSIS BANNER
+    // ==========================================
+    const diagY = ptCardY + 54;
+    doc.roundedRect(42, diagY, 511, 26, 6)
+       .fillAndStroke("#f0fdfa", "#99f6e4");
+
+    doc.font(fontBold)
+       .fontSize(9)
+       .fillColor("#0f766e")
+       .text("DIAGNOSIS / লক্ষণ ও রোগ নির্ণয়:", 54, diagY + 8);
+
+    doc.font(fontRegular)
+       .fontSize(9.5)
+       .fillColor("#134e4a")
+       .text(prescription.diagnosis, 220, diagY + 8);
+
+    // ==========================================
+    // 7. Rx SYMBOL & MEDICINES SECTION
+    // ==========================================
+    const rxY = diagY + 34;
+    doc.font("Helvetica-Bold")
+       .fontSize(24)
+       .fillColor("#0f766e")
+       .text("Rx", 42, rxY);
 
     // Medicines Table Header
-    const medTableY = rxY + 35;
-    doc.rect(40, medTableY, 515, 24).fill("#f1f5f9");
-    doc.fillColor("#334155").font(fontBold).fontSize(9);
-    doc.text("#", 50, medTableY + 7);
-    doc.text("MEDICINE NAME", 80, medTableY + 7);
-    doc.text("DOSAGE / FREQUENCY", 290, medTableY + 7);
-    doc.text("DURATION", 450, medTableY + 7);
+    const tblY = rxY + 30;
+    doc.roundedRect(42, tblY, 511, 22, 4).fill("#f1f5f9");
+    doc.fillColor("#334155").font(fontBold).fontSize(8.5);
+    doc.text("#", 52, tblY + 6);
+    doc.text("MEDICINE NAME (ওষুধের নাম)", 75, tblY + 6);
+    doc.text("DOSAGE / FREQUENCY (সেবনবিধি)", 270, tblY + 6);
+    doc.text("DURATION (সময়কাল)", 445, tblY + 6);
 
     // Medicine Rows
-    let currentY = medTableY + 28;
+    let curY = tblY + 24;
     prescription.medicines.forEach((med, index) => {
-      doc.font(fontBold).fontSize(9).fillColor("#0f172a");
-      doc.text(`${index + 1}.`, 50, currentY);
-      doc.text(med.name, 80, currentY);
+      doc.font(fontBold).fontSize(8.5).fillColor("#0f766e").text(`${index + 1}.`, 52, curY + 6);
+      doc.font(fontBold).fontSize(9).fillColor("#0f172a").text(med.name, 75, curY + 6);
+      doc.font(fontRegular).fontSize(8.5).fillColor("#334155").text(med.dosage, 270, curY + 6);
+      doc.font(fontRegular).fontSize(8.5).fillColor("#334155").text(med.duration, 445, curY + 6);
 
-      doc.font(fontRegular).fontSize(9).fillColor("#334155");
-      doc.text(med.dosage, 290, currentY);
-      doc.text(med.duration, 450, currentY);
-
-      doc
-        .strokeColor("#e2e8f0")
-        .lineWidth(0.5)
-        .moveTo(40, currentY + 16)
-        .lineTo(555, currentY + 16)
-        .stroke();
-      currentY += 24;
+      curY += 24;
+      doc.strokeColor("#f1f5f9").lineWidth(0.8).moveTo(42, curY).lineTo(553, curY).stroke();
     });
 
-    // Medical / Diagnostic Tests Section (if prescribed)
+    // ==========================================
+    // 8. DIAGNOSTIC TESTS (IF PRESCRIBED)
+    // ==========================================
     if (prescription.tests && prescription.tests.length > 0) {
-      currentY += 14;
-      doc.rect(40, currentY, 515, 22).fill("#f0fdf4");
-      doc
-        .fillColor("#065f46")
-        .font(fontBold)
-        .fontSize(9.5)
-        .text("RECOMMENDED DIAGNOSTIC TESTS / প্যাথলজিক্যাল পরীক্ষা:", 50, currentY + 6);
-      currentY += 28;
+      curY += 10;
+      const testBoxH = 26 + prescription.tests.length * 16;
+      doc.roundedRect(42, curY, 511, testBoxH, 6)
+         .fillAndStroke("#f0fdf4", "#bbf7d0");
 
+      doc.font(fontBold)
+         .fontSize(9)
+         .fillColor("#166534")
+         .text("RECOMMENDED DIAGNOSTIC TESTS / প্যাথলজিক্যাল পরীক্ষা:", 54, curY + 8);
+
+      let tY = curY + 24;
       prescription.tests.forEach((testItem, idx) => {
-        doc.font(fontRegular).fontSize(9).fillColor("#1e293b");
-        doc.text(`${idx + 1}. ${testItem}`, 55, currentY);
-        currentY += 18;
+        doc.font(fontRegular).fontSize(8.5).fillColor("#14532d").text(`${idx + 1}. ${testItem}`, 54, tY);
+        tY += 16;
       });
+      curY += testBoxH;
     }
 
-    // Advice / Instructions
+    // ==========================================
+    // 9. ADVICE / INSTRUCTIONS
+    // ==========================================
     if (prescription.notes) {
-      currentY += 12;
-      doc.rect(40, currentY, 515, 22).fill("#f8fafc");
-      doc
-        .fillColor("#0f766e")
-        .font(fontBold)
-        .fontSize(10)
-        .text("ADVICE & INSTRUCTIONS / চিকিৎসকের পরামর্শ:", 50, currentY + 6);
-      currentY += 28;
-      doc
-        .fillColor("#334155")
-        .font(fontRegular)
-        .fontSize(9)
-        .text(prescription.notes, 50, currentY, {
-          width: 495,
-          lineGap: 3,
-        });
-      currentY += 40;
+      curY += 10;
+      doc.roundedRect(42, curY, 511, 46, 6)
+         .fillAndStroke("#f8fafc", "#e2e8f0");
+
+      doc.font(fontBold)
+         .fontSize(9)
+         .fillColor("#0f766e")
+         .text("ADVICE & CLINICAL INSTRUCTIONS / চিকিৎসকের পরামর্শ:", 54, curY + 8);
+
+      doc.font(fontRegular)
+         .fontSize(8.5)
+         .fillColor("#334155")
+         .text(prescription.notes, 54, curY + 23, {
+           width: 485,
+           lineGap: 2,
+         });
+      curY += 56;
     }
 
-    // Signature line
-    const signY = Math.max(currentY + 35, 680);
-    doc
-      .strokeColor("#94a3b8")
-      .lineWidth(1)
-      .moveTo(380, signY)
-      .lineTo(540, signY)
-      .stroke();
-    doc
-      .fillColor("#1e293b")
-      .font(fontBold)
-      .fontSize(9)
-      .text(`Dr. ${prescription.doctor.name}`, 380, signY + 6, {
-        align: "center",
-        width: 160,
-      });
-    doc
-      .font(fontRegular)
-      .fontSize(8)
-      .fillColor("#64748b")
-      .text("Registered Medical Practitioner", 380, signY + 18, {
-        align: "center",
-        width: 160,
-      });
+    // ==========================================
+    // 10. SIGNATURE LINE & DIGITAL SEAL
+    // ==========================================
+    const signY = Math.max(curY + 25, 700);
 
-    // Bottom verification notice
-    doc.fontSize(8).font(fontRegular).fillColor("#94a3b8");
-    doc.text(
-      "DocSheba Health Portal · Digitally Certified Prescription · Not valid for narcotic substances",
-      40,
-      760,
-      { align: "center", width: 515 }
-    );
+    // Doctor signature line
+    doc.strokeColor("#94a3b8").lineWidth(1).moveTo(380, signY).lineTo(540, signY).stroke();
+    doc.font(fontBold).fontSize(9).fillColor("#0f172a").text(`Dr. ${prescription.doctor.name}`, 380, signY + 5, { width: 160, align: "center" });
+    doc.font(fontRegular).fontSize(8).fillColor("#64748b").text("Registered Medical Practitioner", 380, signY + 16, { width: 160, align: "center" });
+
+    // Digital verification certification badge
+    doc.roundedRect(42, signY - 8, 175, 32, 6).fillAndStroke("#ecfdf5", "#a7f3d0");
+    doc.font(fontBold).fontSize(8).fillColor("#059669").text("✓ DIGITALLY CERTIFIED PRESCRIPTION", 50, signY);
+    doc.font(fontRegular).fontSize(7).fillColor("#047857").text("Verified via DocSheba Healthcare Network", 50, signY + 12);
+
+    // ==========================================
+    // 11. MODERN CURVED FOOTER WAVES
+    // ==========================================
+    doc.save();
+    doc.moveTo(0, 842)
+       .lineTo(595, 842)
+       .lineTo(595, 785)
+       .bezierCurveTo(420, 810, 180, 770, 0, 795)
+       .closePath()
+       .fill("#0f766e");
+
+    doc.opacity(0.3)
+       .moveTo(0, 842)
+       .lineTo(595, 842)
+       .lineTo(595, 800)
+       .bezierCurveTo(380, 825, 200, 780, 0, 810)
+       .closePath()
+       .fill("#14b8a6");
+    doc.restore();
+
+    doc.font(fontBold)
+       .fontSize(8.5)
+       .fillColor("#ffffff")
+       .text("DocSheba Medical Center · 24/7 Digital Outpatient Clinic & Diagnostics", 0, 805, { align: "center", width: 595 });
+
+    doc.font(fontRegular)
+       .fontSize(7.5)
+       .fillColor("#ccfbf1")
+       .text("Hotline: +880 1700-000000 · Support: support@docsheba.com · Valid for 30 days from issue", 0, 819, { align: "center", width: 595 });
 
     doc.end();
   } catch (error) {

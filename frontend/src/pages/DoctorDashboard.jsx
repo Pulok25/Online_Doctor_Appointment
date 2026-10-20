@@ -16,6 +16,13 @@ import {
   Sparkles,
   Camera,
   Upload,
+  FileText,
+  Download,
+  Trash2,
+  X,
+  Eye,
+  Pill,
+  CreditCard,
 } from "lucide-react";
 
 export default function DoctorDashboard() {
@@ -27,6 +34,23 @@ export default function DoctorDashboard() {
   const [updatingId, setUpdatingId] = useState(null);
   const [activeTab, setActiveTab] = useState("appointments");
   const [photoUploading, setPhotoUploading] = useState(false);
+
+  // Prescription creation modal state
+  const [prescriptionModalAppt, setPrescriptionModalAppt] = useState(null);
+  const [prescriptionForm, setPrescriptionForm] = useState({
+    diagnosis: "",
+    patientAge: "",
+    patientGender: "Male",
+    medicines: [{ name: "", dosage: "", duration: "" }],
+    tests: [""],
+    notes: "",
+  });
+  const [prescriptionSubmitting, setPrescriptionSubmitting] = useState(false);
+  const [prescriptionError, setPrescriptionError] = useState("");
+
+  // View prescription modal state
+  const [viewPrescriptionModal, setViewPrescriptionModal] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
 
   // Slots management state
   const [slots, setSlots] = useState([]);
@@ -52,7 +76,7 @@ export default function DoctorDashboard() {
   const fetchAppointments = async () => {
     try {
       const res = await axiosInstance.get("/appointments/myappointment");
-      setAppointments(res.data.payload.appointments);
+      setAppointments(res.data.payload.appointments || []);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load patient appointments");
     } finally {
@@ -64,7 +88,7 @@ export default function DoctorDashboard() {
     setSlotsLoading(true);
     try {
       const res = await axiosInstance.get("/slots/my-slots");
-      setSlots(res.data.payload.slots);
+      setSlots(res.data.payload.slots || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -105,18 +129,145 @@ export default function DoctorDashboard() {
     }
   };
 
-  const handleComplete = async (id) => {
-    setUpdatingId(id);
-    setError("");
+  // Prescription modal triggers
+  const openPrescribeModal = (appt) => {
+    setPrescriptionModalAppt(appt);
+    setPrescriptionForm({
+      diagnosis: "",
+      medicines: [{ name: "", dosage: "", duration: "" }],
+      notes: "",
+    });
+    setPrescriptionError("");
+  };
+
+  const closePrescribeModal = () => {
+    setPrescriptionModalAppt(null);
+    setPrescriptionError("");
+  };
+
+  const handleAddMedicine = () => {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      medicines: [...prev.medicines, { name: "", dosage: "", duration: "" }],
+    }));
+  };
+
+  const handleRemoveMedicine = (index) => {
+    if (prescriptionForm.medicines.length <= 1) return;
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      medicines: prev.medicines.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleMedicineChange = (index, field, value) => {
+    setPrescriptionForm((prev) => {
+      const updated = [...prev.medicines];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, medicines: updated };
+    });
+  };
+
+  const handleAddTest = () => {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      tests: [...(prev.tests || []), ""],
+    }));
+  };
+
+  const handleRemoveTest = (index) => {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      tests: (prev.tests || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleTestChange = (index, value) => {
+    setPrescriptionForm((prev) => {
+      const updated = [...(prev.tests || [])];
+      updated[index] = value;
+      return { ...prev, tests: updated };
+    });
+  };
+
+  const handleSubmitPrescription = async (e) => {
+    e.preventDefault();
+    if (!prescriptionForm.diagnosis.trim()) {
+      setPrescriptionError("Clinical diagnosis is required");
+      return;
+    }
+    for (const med of prescriptionForm.medicines) {
+      if (!med.name.trim() || !med.dosage.trim() || !med.duration.trim()) {
+        setPrescriptionError("Please fill out name, dosage, and duration for each prescribed medicine");
+        return;
+      }
+    }
+
+    setPrescriptionSubmitting(true);
+    setPrescriptionError("");
+
     try {
-      await axiosInstance.patch(`/appointments/${id}/status`, {
-        status: "completed",
+      await axiosInstance.post("/prescriptions", {
+        appointmentId: prescriptionModalAppt._id,
+        diagnosis: prescriptionForm.diagnosis,
+        patientAge: prescriptionForm.patientAge,
+        patientGender: prescriptionForm.patientGender,
+        medicines: prescriptionForm.medicines,
+        tests: (prescriptionForm.tests || []).filter((t) => t.trim()),
+        notes: prescriptionForm.notes,
       });
+      setPrescriptionModalAppt(null);
       await fetchAppointments();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to update appointment status");
+      setPrescriptionError(
+        err.response?.data?.message || "Failed to save prescription"
+      );
     } finally {
-      setUpdatingId(null);
+      setPrescriptionSubmitting(false);
+    }
+  };
+
+  const handleDownloadPrescription = async (appointmentId) => {
+    try {
+      const res = await axiosInstance.get(
+        `/prescriptions/${appointmentId}/download`,
+        { responseType: "blob" }
+      );
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Prescription-${appointmentId.slice(-6)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      let errMsg = "Failed to download prescription PDF";
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.message) errMsg = parsed.message;
+        } catch (_) {}
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      }
+      alert(errMsg);
+    }
+  };
+
+  const handleViewPrescription = async (appointmentId) => {
+    setViewLoading(true);
+    try {
+      const res = await axiosInstance.get(
+        `/prescriptions/appointment/${appointmentId}`
+      );
+      setViewPrescriptionModal(res.data.payload);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to fetch prescription details");
+    } finally {
+      setViewLoading(false);
     }
   };
 
@@ -387,28 +538,63 @@ export default function DoctorDashboard() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 self-start lg:self-center">
+                    <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-center">
                       <span
                         className={`inline-block text-xs font-semibold px-3 py-1.5 rounded-xl border ${badge.bg}`}
                       >
                         {badge.label}
                       </span>
 
+                      {/* Payment Status indicator */}
+                      {appt.invoiceAmount && (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-xl border ${
+                            appt.paymentStatus === "paid"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          <CreditCard className="w-3 h-3" />
+                          <span>
+                            {appt.paymentStatus === "paid"
+                              ? `Paid ৳${appt.invoiceAmount}`
+                              : `Unpaid ৳${appt.invoiceAmount}`}
+                          </span>
+                        </span>
+                      )}
+
+                      {/* Approved: Write Prescription & Complete Visit */}
                       {appt.status === "approved" && (
                         <button
-                          onClick={() => handleComplete(appt._id)}
-                          disabled={updatingId === appt._id}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all shadow-sm shadow-emerald-600/20 active:scale-98 disabled:opacity-60"
+                          onClick={() => openPrescribeModal(appt)}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition-all shadow-sm shadow-teal-600/20 active:scale-98"
                         >
-                          {updatingId === appt._id ? (
-                            <span>Updating...</span>
-                          ) : (
-                            <>
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Complete Visit</span>
-                            </>
-                          )}
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Write Prescription & Complete</span>
                         </button>
+                      )}
+
+                      {/* Completed: View Prescription & Download PDF */}
+                      {appt.status === "completed" && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewPrescription(appt._id)}
+                            disabled={viewLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all"
+                            title="View e-Prescription"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-teal-600" />
+                            <span>View Rx</span>
+                          </button>
+                          <button
+                            onClick={() => handleDownloadPrescription(appt._id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl text-xs font-semibold transition-all"
+                            title="Download Medical Report PDF"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>PDF</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -574,6 +760,380 @@ export default function DoctorDashboard() {
           </div>
         )}
       </div>
+
+      {/* ========================================================
+          MODAL 1: WRITE PRESCRIPTION & COMPLETE VISIT
+         ======================================================== */}
+      {prescriptionModalAppt && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 sm:p-7 my-8 animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-semibold mb-1">
+                  <Stethoscope className="w-3.5 h-3.5" />
+                  <span>Clinical Prescription</span>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">
+                  Prescribe & Complete Consultation
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Patient: <strong className="text-slate-700">{prescriptionModalAppt.patient?.name}</strong> · Slot: {prescriptionModalAppt.slot?.date?.slice(0, 10)} ({prescriptionModalAppt.slot?.startTime} - {prescriptionModalAppt.slot?.endTime})
+                </p>
+              </div>
+              <button
+                onClick={closePrescribeModal}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {prescriptionModalAppt.reason && (
+              <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                <strong className="text-slate-700">Patient Note:</strong> {prescriptionModalAppt.reason}
+              </div>
+            )}
+
+            {prescriptionError && (
+              <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{prescriptionError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitPrescription} className="mt-5 space-y-5">
+              {/* Patient Demographics: Age & Gender */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Patient Age (রোগীর বয়স)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 28 Years / ২৮ বছর"
+                    value={prescriptionForm.patientAge}
+                    onChange={(e) =>
+                      setPrescriptionForm({
+                        ...prescriptionForm,
+                        patientAge: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs text-slate-900 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Patient Gender (লিঙ্গ)
+                  </label>
+                  <select
+                    value={prescriptionForm.patientGender}
+                    onChange={(e) =>
+                      setPrescriptionForm({
+                        ...prescriptionForm,
+                        patientGender: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs text-slate-900 bg-white"
+                  >
+                    <option value="Male">Male (পুরুষ)</option>
+                    <option value="Female">Female (মহিলা)</option>
+                    <option value="Other">Other (অন্যান্য)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Diagnosis */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Diagnosis / Clinical Findings <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Acute Upper Respiratory Tract Infection, Seasonal Allergic Rhinitis"
+                  value={prescriptionForm.diagnosis}
+                  onChange={(e) =>
+                    setPrescriptionForm({
+                      ...prescriptionForm,
+                      diagnosis: e.target.value,
+                    })
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 text-xs text-slate-900 bg-slate-50/50"
+                />
+              </div>
+
+              {/* Medicines Dynamic List */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Pill className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Prescribed Medicines (Rx)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddMedicine}
+                    className="flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Medicine</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                  {prescriptionForm.medicines.map((med, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center gap-2"
+                    >
+                      <input
+                        type="text"
+                        required
+                        placeholder="Medicine name (e.g. Napa Extra 500mg)"
+                        value={med.name}
+                        onChange={(e) =>
+                          handleMedicineChange(idx, "name", e.target.value)
+                        }
+                        className="w-full sm:flex-1 px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs bg-white text-slate-900"
+                      />
+                      <input
+                        type="text"
+                        required
+                        placeholder="Dosage (e.g. 1+0+1 after meals)"
+                        value={med.dosage}
+                        onChange={(e) =>
+                          handleMedicineChange(idx, "dosage", e.target.value)
+                        }
+                        className="w-full sm:w-44 px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs bg-white text-slate-900"
+                      />
+                      <input
+                        type="text"
+                        required
+                        placeholder="Duration (e.g. 5 days)"
+                        value={med.duration}
+                        onChange={(e) =>
+                          handleMedicineChange(idx, "duration", e.target.value)
+                        }
+                        className="w-full sm:w-28 px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs bg-white text-slate-900"
+                      />
+                      {prescriptionForm.medicines.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedicine(idx)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors self-end sm:self-center"
+                          title="Remove medicine"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recommended Diagnostic Tests / Investigations */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Recommended Tests / পরীক্ষা সমূহ (Optional)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddTest}
+                    className="flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Test</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {(prescriptionForm.tests || []).map((testItem, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. CBC, Serum Creatinine, X-Ray Chest PA View, RBS"
+                        value={testItem}
+                        onChange={(e) => handleTestChange(idx, e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs bg-slate-50/50 text-slate-900"
+                      />
+                      {prescriptionForm.tests.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTest(idx)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Remove test"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Advice / Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Advice & Clinical Instructions (পরামর্শ)
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Drink plenty of warm water, take rest, revisit in 7 days if symptoms persist."
+                  value={prescriptionForm.notes}
+                  onChange={(e) =>
+                    setPrescriptionForm({
+                      ...prescriptionForm,
+                      notes: e.target.value,
+                    })
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 text-xs text-slate-900 bg-slate-50/50"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={closePrescribeModal}
+                  disabled={prescriptionSubmitting}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={prescriptionSubmitting}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm shadow-teal-600/20 transition-all active:scale-98 disabled:opacity-60"
+                >
+                  {prescriptionSubmitting ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Saving & Completing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Save Prescription & Complete Visit</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          MODAL 2: VIEW COMPLETED PRESCRIPTION DETAILS
+         ======================================================== */}
+      {viewPrescriptionModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 sm:p-7 my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold mb-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Prescription Record</span>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">
+                  e-Prescription Summary
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Patient: <strong className="text-slate-700">{viewPrescriptionModal.patientName || viewPrescriptionModal.patient?.name}</strong>
+                  {viewPrescriptionModal.patientAge && ` · Age: ${viewPrescriptionModal.patientAge}`}
+                  {viewPrescriptionModal.patientGender && ` · Gender: ${viewPrescriptionModal.patientGender}`}
+                  {" · Date: " + new Date(viewPrescriptionModal.createdAt).toDateString()}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewPrescriptionModal(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="p-3.5 rounded-2xl bg-teal-50/60 border border-teal-100">
+                <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block mb-1">
+                  Diagnosis
+                </span>
+                <p className="text-xs text-slate-800 font-medium">
+                  {viewPrescriptionModal.diagnosis}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
+                  Prescribed Medicines
+                </span>
+                <div className="border border-slate-200 rounded-2xl overflow-hidden text-xs">
+                  <div className="grid grid-cols-12 bg-slate-100 p-2.5 font-semibold text-slate-700">
+                    <div className="col-span-5">Medicine</div>
+                    <div className="col-span-4">Dosage</div>
+                    <div className="col-span-3 text-right">Duration</div>
+                  </div>
+                  {viewPrescriptionModal.medicines?.map((m, i) => (
+                    <div
+                      key={i}
+                      className="grid grid-cols-12 p-2.5 border-t border-slate-100 text-slate-800"
+                    >
+                      <div className="col-span-5 font-medium">{m.name}</div>
+                      <div className="col-span-4 text-slate-600">{m.dosage}</div>
+                      <div className="col-span-3 text-right text-slate-600">{m.duration}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {viewPrescriptionModal.tests && viewPrescriptionModal.tests.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-100">
+                  <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Recommended Tests (ডায়াগনস্টিক পরীক্ষা)</span>
+                  </span>
+                  <ul className="list-disc list-inside space-y-1 text-xs text-slate-700 font-medium">
+                    {viewPrescriptionModal.tests.map((testItem, i) => (
+                      <li key={i}>{testItem}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {viewPrescriptionModal.notes && (
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                    Doctor's Advice
+                  </span>
+                  <p className="text-xs text-slate-600">
+                    {viewPrescriptionModal.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-5 mt-5 border-t border-slate-100">
+              <button
+                onClick={() =>
+                  handleDownloadPrescription(viewPrescriptionModal.appointment)
+                }
+                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition-all shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF Medical Report</span>
+              </button>
+              <button
+                onClick={() => setViewPrescriptionModal(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

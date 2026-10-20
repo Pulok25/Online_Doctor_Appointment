@@ -9,6 +9,8 @@ const {
   getAllAppointments,
   cancelAppointmentByAdmin,
   rescheduleAppointment,
+  payAppointment,
+  downloadInvoice,
 } = require("../controller/appointmentController");
 
 const appointmentRouter = express.Router();
@@ -20,5 +22,7 @@ appointmentRouter.patch("/:id/status", isLoggedIn, updateAppointmentStatus);
 appointmentRouter.patch("/:id/approve", isLoggedIn, isAdmin, approveAppointment);
 appointmentRouter.patch("/:id/cancel", isLoggedIn, isAdmin, cancelAppointmentByAdmin);
 appointmentRouter.patch("/:id/reschedule", isLoggedIn, isAdmin, rescheduleAppointment);
+appointmentRouter.patch("/:id/pay", isLoggedIn, payAppointment);
+appointmentRouter.get("/:id/invoice", isLoggedIn, downloadInvoice);
 
 module.exports = appointmentRouter;

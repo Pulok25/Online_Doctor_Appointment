@@ -22,6 +22,9 @@ import {
   Edit3,
   Stethoscope,
   Filter,
+  Download,
+  Receipt,
+  CreditCard,
 } from "lucide-react";
 
 export default function AdminApplications() {
@@ -51,6 +54,67 @@ export default function AdminApplications() {
     endTime: "",
   });
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
+
+  // Download PDF helpers for admin
+  const handleDownloadAdminInvoice = async (appointmentId, invoiceNumber) => {
+    try {
+      const res = await axiosInstance.get(
+        `/appointments/${appointmentId}/invoice`,
+        { responseType: "blob" }
+      );
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Invoice-${invoiceNumber || appointmentId.slice(-6)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      let errMsg = "Failed to download invoice receipt";
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.message) errMsg = parsed.message;
+        } catch (_) {}
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      }
+      alert(errMsg);
+    }
+  };
+
+  const handleDownloadAdminPrescription = async (appointmentId) => {
+    try {
+      const res = await axiosInstance.get(
+        `/prescriptions/${appointmentId}/download`,
+        { responseType: "blob" }
+      );
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Prescription-${appointmentId.slice(-6)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      let errMsg = "Failed to download prescription document";
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.message) errMsg = parsed.message;
+        } catch (_) {}
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      }
+      alert(errMsg);
+    }
+  };
 
   // Fetch Appointments
   const fetchAppointments = async () => {
@@ -411,6 +475,55 @@ export default function AdminApplications() {
                         <BadgeIcon className="w-3.5 h-3.5" />
                         <span>{badge.label}</span>
                       </span>
+
+                      {/* Invoice & Payment Pill for Admin */}
+                      {appt.invoiceAmount && (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-xl border ${
+                            appt.paymentStatus === "paid"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          <CreditCard className="w-3 h-3" />
+                          <span>
+                            {appt.paymentStatus === "paid"
+                              ? `Paid ৳${appt.invoiceAmount}`
+                              : `Unpaid ৳${appt.invoiceAmount}`}
+                          </span>
+                        </span>
+                      )}
+
+                      {/* Download Invoice Button for Admin */}
+                      {appt.invoiceNumber && (
+                        <button
+                          onClick={() =>
+                            handleDownloadAdminInvoice(
+                              appt._id,
+                              appt.invoiceNumber
+                            )
+                          }
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-teal-50 hover:text-teal-700 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all"
+                          title="Download Invoice PDF"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-teal-600" />
+                          <span>Invoice</span>
+                        </button>
+                      )}
+
+                      {/* Download Rx Button for Admin (if completed) */}
+                      {appt.status === "completed" && (
+                        <button
+                          onClick={() =>
+                            handleDownloadAdminPrescription(appt._id)
+                          }
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl text-xs font-semibold transition-all"
+                          title="Download Patient Medical Report PDF"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Rx PDF</span>
+                        </button>
+                      )}
 
                       {/* If pending: Show Approve button */}
                       {appt.status === "pending" && (

@@ -14,6 +14,16 @@ import {
   ArrowRight,
   HeartPulse,
   Filter,
+  CreditCard,
+  FileText,
+  Download,
+  Eye,
+  Receipt,
+  Check,
+  X,
+  Pill,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 
 export default function PatientDashboard() {
@@ -23,20 +33,147 @@ export default function PatientDashboard() {
   const [error, setError] = useState("");
   const [filterTab, setFilterTab] = useState("all");
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        const res = await axiosInstance.get("/appointments/myappointment");
-        setAppointments(res.data.payload.appointments || []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load appointments");
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Payment Demo Modal state
+  const [payModalAppt, setPayModalAppt] = useState(null);
+  const [paySubmitting, setPaySubmitting] = useState(false);
+  const [paySuccessMsg, setPaySuccessMsg] = useState("");
+  const [payError, setPayError] = useState("");
 
+  // Prescription View Modal state
+  const [viewPrescriptionModal, setViewPrescriptionModal] = useState(null);
+  const [prescriptionLoading, setPrescriptionLoading] = useState(false);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const fetchAppointments = async () => {
+    try {
+      const res = await axiosInstance.get("/appointments/myappointment");
+      setAppointments(res.data.payload.appointments || []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load appointments");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAppointments();
   }, []);
+
+  // Payment action
+  const openPayModal = (appt) => {
+    setPayModalAppt(appt);
+    setPayError("");
+    setPaySuccessMsg("");
+  };
+
+  const closePayModal = () => {
+    setPayModalAppt(null);
+    setPayError("");
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!payModalAppt) return;
+    setPaySubmitting(true);
+    setPayError("");
+    try {
+      await axiosInstance.patch(`/appointments/${payModalAppt._id}/pay`);
+      setPaySuccessMsg("Payment confirmed successfully! Your official invoice receipt is now available.");
+      await fetchAppointments();
+      setTimeout(() => {
+        setPayModalAppt(null);
+        setPaySuccessMsg("");
+      }, 1600);
+    } catch (err) {
+      setPayError(err.response?.data?.message || "Failed to process payment");
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
+
+  // Download Invoice PDF
+  const handleDownloadInvoice = async (appointmentId, invoiceNumber) => {
+    setDownloadingId(`inv-${appointmentId}`);
+    try {
+      const res = await axiosInstance.get(
+        `/appointments/${appointmentId}/invoice`,
+        { responseType: "blob" }
+      );
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Invoice-${invoiceNumber || appointmentId.slice(-6)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      let errMsg = "Failed to download invoice receipt";
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.message) errMsg = parsed.message;
+        } catch (_) {}
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      }
+      alert(errMsg);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // Download Prescription PDF
+  const handleDownloadPrescription = async (appointmentId) => {
+    setDownloadingId(`rx-${appointmentId}`);
+    try {
+      const res = await axiosInstance.get(
+        `/prescriptions/${appointmentId}/download`,
+        { responseType: "blob" }
+      );
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Prescription-${appointmentId.slice(-6)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      let errMsg = "Failed to download prescription document";
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.message) errMsg = parsed.message;
+        } catch (_) {}
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      }
+      alert(errMsg);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // View Prescription
+  const handleViewPrescription = async (appointmentId) => {
+    setPrescriptionLoading(true);
+    try {
+      const res = await axiosInstance.get(
+        `/prescriptions/appointment/${appointmentId}`
+      );
+      setViewPrescriptionModal(res.data.payload);
+    } catch (err) {
+      alert(
+        err.response?.data?.message || "Prescription details not available yet"
+      );
+    } finally {
+      setPrescriptionLoading(false);
+    }
+  };
 
   const statusBadge = {
     pending: {
@@ -309,13 +446,78 @@ export default function PatientDashboard() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-start md:self-center">
+                  <div className="flex flex-wrap items-center gap-2.5 self-start md:self-center">
                     <span
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold capitalize ${statusCfg.bg}`}
                     >
                       <StatusIcon className="w-3.5 h-3.5" />
                       {statusCfg.label}
                     </span>
+
+                    {/* Pending state */}
+                    {appt.status === "pending" && (
+                      <span className="text-[11px] text-slate-400 font-medium hidden sm:inline-block">
+                        Awaiting clinic approval
+                      </span>
+                    )}
+
+                    {/* Approved & Unpaid: Proceed to Pay */}
+                    {appt.status === "approved" && appt.paymentStatus !== "paid" && (
+                      <button
+                        onClick={() => openPayModal(appt)}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-xl text-xs font-semibold transition-all shadow-sm shadow-teal-600/20 active:scale-98"
+                      >
+                        <CreditCard className="w-3.5 h-3.5" />
+                        <span>Pay ৳{appt.invoiceAmount || 500} (Demo)</span>
+                      </button>
+                    )}
+
+                    {/* Paid Badge & Invoice Receipt Download */}
+                    {appt.paymentStatus === "paid" && (
+                      <button
+                        onClick={() =>
+                          handleDownloadInvoice(appt._id, appt.invoiceNumber)
+                        }
+                        disabled={downloadingId === `inv-${appt._id}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 rounded-xl text-xs font-semibold transition-all active:scale-98 disabled:opacity-60"
+                        title="Download Official Invoice Receipt"
+                      >
+                        <Receipt className="w-3.5 h-3.5 text-teal-600" />
+                        <span>
+                          {downloadingId === `inv-${appt._id}`
+                            ? "Downloading..."
+                            : "Invoice PDF"}
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Completed: View Prescription & Download Medical Report */}
+                    {appt.status === "completed" && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleViewPrescription(appt._id)}
+                          disabled={prescriptionLoading}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all"
+                          title="View Doctor Prescription"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-teal-600" />
+                          <span>View Rx</span>
+                        </button>
+                        <button
+                          onClick={() => handleDownloadPrescription(appt._id)}
+                          disabled={downloadingId === `rx-${appt._id}`}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all shadow-sm shadow-emerald-600/20"
+                          title="Download Official Prescription PDF"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>
+                            {downloadingId === `rx-${appt._id}`
+                              ? "Downloading..."
+                              : "Prescription PDF"}
+                          </span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               );
@@ -323,6 +525,240 @@ export default function PatientDashboard() {
           </div>
         </motion.div>
       </div>
+
+      {/* ========================================================
+          MODAL 1: DEMO INVOICE PAYMENT CONFIRMATION
+         ======================================================== */}
+      {payModalAppt && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 sm:p-7 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100 shadow-2xs">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Consultation Payment
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Instant Demo Payment Gateway
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closePayModal}
+                disabled={paySubmitting}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Error or Success Notice */}
+            {payError && (
+              <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{payError}</span>
+              </div>
+            )}
+            {paySuccessMsg && (
+              <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />
+                <span>{paySuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Invoice Summary */}
+            <div className="mt-5 space-y-3.5">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Doctor:</span>
+                  <strong className="text-slate-900 font-semibold">
+                    Dr. {payModalAppt.doctor?.name}
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Date & Slot:</span>
+                  <span className="text-slate-700 font-medium">
+                    {payModalAppt.slot?.date?.slice(0, 10)} ({payModalAppt.slot?.startTime} - {payModalAppt.slot?.endTime})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Invoice Number:</span>
+                  <span className="text-slate-700 font-mono text-[11px]">
+                    {payModalAppt.invoiceNumber || "INV-NEW"}
+                  </span>
+                </div>
+                <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-sm">
+                  <span className="font-bold text-slate-900">Total Payable:</span>
+                  <span className="font-extrabold text-teal-600 text-base">
+                    ৳{payModalAppt.invoiceAmount || 500} BDT
+                  </span>
+                </div>
+              </div>
+
+              {/* Sandbox notice */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-100 flex items-start gap-2.5 text-xs text-emerald-800">
+                <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-semibold block text-emerald-900 mb-0.5">
+                    Demo Mode Enabled
+                  </strong>
+                  Clicking "Confirm Payment" instantly verifies this invoice and unlocks your downloadable PDF receipt. (Payment gateway integration will connect here in production).
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center justify-end gap-3 pt-5 mt-5 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={closePayModal}
+                disabled={paySubmitting}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPayment}
+                disabled={paySubmitting || !!paySuccessMsg}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm shadow-teal-600/20 transition-all active:scale-98 disabled:opacity-60"
+              >
+                {paySubmitting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Confirm & Pay ৳{payModalAppt.invoiceAmount || 500}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          MODAL 2: VIEW PRESCRIPTION
+         ======================================================== */}
+      {viewPrescriptionModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 sm:p-7 my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-semibold mb-1">
+                  <Stethoscope className="w-3.5 h-3.5" />
+                  <span>Clinical Prescription</span>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">
+                  Doctor's e-Prescription
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Doctor: <strong className="text-slate-700">Dr. {viewPrescriptionModal.doctor?.name}</strong>
+                  {viewPrescriptionModal.patientAge && ` · Patient Age: ${viewPrescriptionModal.patientAge}`}
+                  {viewPrescriptionModal.patientGender && ` · Gender: ${viewPrescriptionModal.patientGender}`}
+                  {" · Date: " + new Date(viewPrescriptionModal.createdAt).toDateString()}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewPrescriptionModal(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {/* Diagnosis */}
+              <div className="p-3.5 rounded-2xl bg-teal-50/60 border border-teal-100">
+                <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block mb-1">
+                  Diagnosis / Clinical Findings
+                </span>
+                <p className="text-xs text-slate-800 font-medium">
+                  {viewPrescriptionModal.diagnosis}
+                </p>
+              </div>
+
+              {/* Medicines Table */}
+              <div>
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                  <Pill className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Prescribed Medicines (Rx)</span>
+                </span>
+                <div className="border border-slate-200 rounded-2xl overflow-hidden text-xs">
+                  <div className="grid grid-cols-12 bg-slate-100 p-2.5 font-semibold text-slate-700">
+                    <div className="col-span-5">Medicine</div>
+                    <div className="col-span-4">Dosage</div>
+                    <div className="col-span-3 text-right">Duration</div>
+                  </div>
+                  {viewPrescriptionModal.medicines?.map((m, i) => (
+                    <div
+                      key={i}
+                      className="grid grid-cols-12 p-2.5 border-t border-slate-100 text-slate-800"
+                    >
+                      <div className="col-span-5 font-medium">{m.name}</div>
+                      <div className="col-span-4 text-slate-600">{m.dosage}</div>
+                      <div className="col-span-3 text-right text-slate-600">{m.duration}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recommended Diagnostic Tests */}
+              {viewPrescriptionModal.tests && viewPrescriptionModal.tests.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-100">
+                  <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Recommended Tests / পরীক্ষা সমূহ</span>
+                  </span>
+                  <ul className="list-disc list-inside space-y-1 text-xs text-slate-700 font-medium">
+                    {viewPrescriptionModal.tests.map((testItem, i) => (
+                      <li key={i}>{testItem}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Advice */}
+              {viewPrescriptionModal.notes && (
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                    Doctor's Advice & Instructions
+                  </span>
+                  <p className="text-xs text-slate-600">
+                    {viewPrescriptionModal.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-between gap-3 pt-5 mt-5 border-t border-slate-100">
+              <button
+                onClick={() =>
+                  handleDownloadPrescription(viewPrescriptionModal.appointment)
+                }
+                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition-all shadow-sm shadow-teal-600/20"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF Medical Report</span>
+              </button>
+              <button
+                onClick={() => setViewPrescriptionModal(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -221,7 +221,7 @@ const getApprovedDoctors = async (req, res, next) => {
       .select("-bmdcNumber")
       .populate({
         path: "user",
-        select: "name email phone isBanned",
+        select: "-phone -email",
         match: { isBanned: false },
       });
 

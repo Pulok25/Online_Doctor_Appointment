@@ -39,7 +39,11 @@ export default function Register() {
 
     try {
       const res = await axiosInstance.post("/users/register", form);
-      setActivationToken(res.data.payload.token);
+      if (res.data?.payload?.token) {
+        setActivationToken(res.data.payload.token);
+      } else {
+        setError(res.data?.message || "Registration completed. Please verify your account.");
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
     } finally {

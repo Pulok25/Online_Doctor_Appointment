@@ -103,17 +103,9 @@ const registerUser = async (req, res, next) => {
 
     const token = rawToken;
 
-    // TODO: email `token` to the user. Until SMTP exists, only expose it outside production.
-    if (isProd) {
-      return successResponse(res, {
-        statusCode: 201,
-        message: "check your email to complete registration",
-      });
-    }
-
     return successResponse(res, {
       statusCode: 201,
-      message: "check your email to complete registration",
+      message: "registration successful, please activate your account",
       payload: { token },
     });
   } catch (error) {

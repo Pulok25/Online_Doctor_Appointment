@@ -47,12 +47,11 @@ const bookAppointment = async (req, res, next) => {
       throw CreateError(409, "You already have an active appointment with this doctor.");
     }
 
-    // Prevent self-booking (VULN-11)
     if (req.user._id.toString() === targetSlot.doctor.toString()) {
       throw CreateError(400, "Doctors cannot book appointments with themselves");
     }
 
-    // Atomic state check & lock: atomically mark slot as booked only if isBooked is false
+    
     const slot = await Slot.findOneAndUpdate(
       { _id: slotId, isBooked: false },
       { $set: { isBooked: true } },
@@ -72,7 +71,7 @@ const bookAppointment = async (req, res, next) => {
         reason,
       });
     } catch (error) {
-      // Rollback slot booking state if appointment creation fails
+      
       await Slot.findByIdAndUpdate(slot._id, { $set: { isBooked: false } });
       if (error.code === 11000) {
         throw CreateError(409, "this slot has already been booked");

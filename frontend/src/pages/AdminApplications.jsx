@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axiosInstance from "../api/axiosInstance";
+import axiosInstance, { BACKEND_URL } from "../api/axiosInstance";
 import {
   ShieldCheck,
   Check,
@@ -650,7 +650,7 @@ export default function AdminApplications() {
                       <div className="flex items-start gap-4 flex-1">
                         {app.image ? (
                           <img
-                            src={`http://localhost:3001/${app.image}`}
+                            src={`${BACKEND_URL}/${app.image}`}
                             alt={app.user?.name}
                             className="w-14 h-14 rounded-2xl object-cover ring-2 ring-teal-100 flex-shrink-0"
                           />

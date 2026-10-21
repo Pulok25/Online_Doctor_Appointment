@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import axiosInstance from "../api/axiosInstance";
+import axiosInstance, { BACKEND_URL } from "../api/axiosInstance";
 import {
   Calendar,
   Clock,
@@ -314,7 +314,7 @@ export default function DoctorDashboard() {
     completed: appointments.filter((a) => a.status === "completed").length,
   };
 
-  const doctorPhotoUrl = profile?.image ? `http://localhost:3001/${profile.image}` : null;
+  const doctorPhotoUrl = profile?.image ? `${BACKEND_URL}/${profile.image}` : null;
 
   return (
     <div className="min-h-screen bg-slate-50/70 medical-bg-mesh pb-20">

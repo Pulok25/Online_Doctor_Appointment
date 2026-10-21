@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import axiosInstance from "../api/axiosInstance";
+import axiosInstance, { BACKEND_URL } from "../api/axiosInstance";
 import { useAuth } from "../context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -265,7 +265,7 @@ export default function DoctorList() {
           {doctors.map((doc, idx) => {
             const hasCustomImage = doc.image && !doc.image.includes("default");
             const imageUrl = hasCustomImage
-              ? `http://localhost:3001/${doc.image}`
+              ? `${BACKEND_URL}/${doc.image}`
               : null;
 
             return (

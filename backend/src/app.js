@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const cors = require("cors");
 const morgan = require("morgan");
 const createError = require("http-errors");
@@ -38,6 +39,8 @@ app.get("/test", (req, res) => {
   res.status(200).json({
     success: true,
     message: "api is working successfully",
+    dbState: mongoose.connection.readyState,
+    hasMongoUrl: Boolean(process.env.MONGODB_URL),
   });
 });
 

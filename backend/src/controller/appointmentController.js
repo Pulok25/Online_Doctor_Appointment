@@ -22,6 +22,10 @@ const bookAppointment = async (req, res, next) => {
   try {
     const { slotId, reason } = req.body;
 
+    if (req.user?.role !== "patient") {
+      throw CreateError(403, "Only authenticated patients can book appointments");
+    }
+
     if (!isObjectId(slotId)) {
       throw CreateError(400, "valid slotId required");
     }
@@ -68,6 +72,11 @@ const bookAppointment = async (req, res, next) => {
         patient: req.user._id,
         doctor: slot.doctor,
         slot: slot._id,
+        slotSnapshot: {
+          date: slot.date,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+        },
         reason,
       });
     } catch (error) {
@@ -109,10 +118,22 @@ const getMyAppointment = async (req, res, next) => {
     }).select("appointment");
     const withRx = new Set(rx.map((p) => p.appointment.toString()));
 
-    const result = appointments.map((a) => ({
-      ...a.toObject(),
-      hasPrescription: withRx.has(a._id.toString()) || !!a.prescription,
-    }));
+    const result = appointments.map((a) => {
+      const obj = a.toObject();
+      if (obj.status === "completed" && obj.slotSnapshot?.date) {
+        obj.slot = {
+          ...(obj.slot || {}),
+          _id: obj.slot?._id || obj.slot,
+          date: obj.slotSnapshot.date,
+          startTime: obj.slotSnapshot.startTime,
+          endTime: obj.slotSnapshot.endTime,
+        };
+      }
+      return {
+        ...obj,
+        hasPrescription: withRx.has(a._id.toString()) || !!a.prescription,
+      };
+    });
 
     return successResponse(res, {
       statusCode: 200,
@@ -166,40 +187,56 @@ const approveAppointment = async (req, res, next) => {
 const updateAppointmentStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
-    const allowed = ["completed", "cancelled"];
 
-    if (!allowed.includes(status)) {
-      throw CreateError(400, `status must be one of: ${allowed.join(", ")}`);
+    if (req.user?.role !== "doctor") {
+      throw CreateError(403, "only doctors can update appointment consultation status");
+    }
+
+    if (status !== "completed") {
+      throw CreateError(400, "doctors can only mark appointments as completed");
     }
     const appointment = await appointmentModel.findById(req.params.id);
     if (!appointment) {
       throw CreateError(404, "appointment not found");
     }
     if (appointment.doctor.toString() !== String(req.user._id)) {
-      throw CreateError(403, "you can only update your own appointments");
+      throw CreateError(403, "you can only update your own assigned appointments");
     }
-    if (["completed", "cancelled"].includes(appointment.status)) {
-      throw CreateError(409, `appointment already ${appointment.status}`);
+    if (appointment.status === "completed") {
+      throw CreateError(409, "appointment already completed");
     }
-    if (status === "completed" && appointment.status !== "approved") {
+    if (appointment.status !== "approved") {
       throw CreateError(
         409,
         "appointment must be admin-approved before it can be completed",
       );
     }
 
-    appointment.status = status;
-    if (status === "cancelled") clearInvoice(appointment);
+    // Preserve historical slot snapshot
+    if (!appointment.slotSnapshot?.date && appointment.slot) {
+      const slotDoc = await Slot.findById(appointment.slot);
+      if (slotDoc) {
+        appointment.slotSnapshot = {
+          date: slotDoc.date,
+          startTime: slotDoc.startTime,
+          endTime: slotDoc.endTime,
+        };
+      }
+    }
+
+    appointment.status = "completed";
     await appointment.save();
 
-    if (status === "cancelled" && appointment.slot) {
-      await Slot.findByIdAndUpdate(appointment.slot, { isBooked: false });
-    }
+    const updatedAppointment = await appointmentModel
+      .findById(appointment._id)
+      .populate("patient", "name email phone")
+      .populate("doctor", "name email")
+      .populate("slot", "date startTime endTime isBooked");
 
     return successResponse(res, {
       statusCode: 200,
-      message: "appointment updated successfully",
-      payload: { appointment },
+      message: "appointment marked as completed successfully",
+      payload: { appointment: updatedAppointment },
     });
   } catch (error) {
     next(error);
@@ -224,10 +261,25 @@ const getAllAppointments = async (req, res, next) => {
       .populate("slot", "date startTime endTime isBooked")
       .sort({ createdAt: -1 });
 
+    const result = appointments.map((a) => {
+      const obj = a.toObject();
+      if (obj.status === "completed" && obj.slotSnapshot?.date) {
+        obj.slot = {
+          ...(obj.slot || {}),
+          _id: obj.slot?._id || obj.slot,
+          date: obj.slotSnapshot.date,
+          startTime: obj.slotSnapshot.startTime,
+          endTime: obj.slotSnapshot.endTime,
+          isBooked: obj.slot?.isBooked,
+        };
+      }
+      return obj;
+    });
+
     return successResponse(res, {
       statusCode: 200,
       message: "all appointments fetched successfully",
-      payload: { appointments },
+      payload: { appointments: result },
     });
   } catch (error) {
     next(error);
@@ -384,6 +436,15 @@ const payAppointment = async (req, res, next) => {
     const appointment = await appointmentModel.findById(req.params.id);
     if (!appointment) throw CreateError(404, "appointment not found");
 
+    if (appointment.status === "completed" && appointment.slotSnapshot?.date) {
+      appointment.slot = {
+        ...(appointment.slot ? (typeof appointment.slot.toObject === "function" ? appointment.slot.toObject() : appointment.slot) : {}),
+        date: appointment.slotSnapshot.date,
+        startTime: appointment.slotSnapshot.startTime,
+        endTime: appointment.slotSnapshot.endTime,
+      };
+    }
+
     if (appointment.patient.toString() !== req.user._id.toString()) {
       throw CreateError(403, "You can only pay for your own appointments");
     }
@@ -446,6 +507,15 @@ const downloadInvoice = async (req, res, next) => {
       .populate("slot", "date startTime endTime");
 
     if (!appointment) throw CreateError(404, "appointment not found");
+
+    if (appointment.status === "completed" && appointment.slotSnapshot?.date) {
+      appointment.slot = {
+        ...(appointment.slot ? (typeof appointment.slot.toObject === "function" ? appointment.slot.toObject() : appointment.slot) : {}),
+        date: appointment.slotSnapshot.date,
+        startTime: appointment.slotSnapshot.startTime,
+        endTime: appointment.slotSnapshot.endTime,
+      };
+    }
 
     const patientId = appointment.patient?._id?.toString() || appointment.patient?.toString();
     const doctorId = appointment.doctor?._id?.toString() || appointment.doctor?.toString();

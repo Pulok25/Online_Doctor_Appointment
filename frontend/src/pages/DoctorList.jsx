@@ -103,6 +103,11 @@ export default function DoctorList() {
       return;
     }
 
+    if (user.role !== "patient") {
+      setBookingError("Only authenticated patients can book appointments. Doctor and admin accounts cannot book.");
+      return;
+    }
+
     setSelectedDoctor(doctor);
     setSelectedSlotId(null);
     setReason("");
@@ -128,6 +133,10 @@ export default function DoctorList() {
   };
 
   const handleBook = async () => {
+    if (user?.role !== "patient") {
+      setBookingError("Only authenticated patients are authorized to book appointments");
+      return;
+    }
     if (!selectedSlotId) {
       setBookingError("Please select a time slot to proceed");
       return;
@@ -344,15 +353,24 @@ export default function DoctorList() {
                     </span>
                   </div>
 
-                  <motion.button
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => openBooking(doc)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition-all shadow-sm shadow-teal-600/20 active:scale-98"
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    Book Slot
-                  </motion.button>
+                  {user && user.role !== "patient" ? (
+                    <span
+                      title="Only authenticated patients can book appointments"
+                      className="px-3 py-2 bg-slate-100 text-slate-400 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-200"
+                    >
+                      Patients Only
+                    </span>
+                  ) : (
+                    <motion.button
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => openBooking(doc)}
+                      className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition-all shadow-sm shadow-teal-600/20 active:scale-98"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      Book Slot
+                    </motion.button>
+                  )}
                 </div>
               </motion.div>
             );

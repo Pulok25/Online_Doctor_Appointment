@@ -41,11 +41,18 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-const isDoctor = (req, res, next)=>{
-  if(req.user?.role !== "doctor"){
-    return next(createError(403, "you are not authorized as a doctor"))
+const isDoctor = (req, res, next) => {
+  if (req.user?.role !== "doctor") {
+    return next(createError(403, "you are not authorized as a doctor"));
   }
-  next()
-}
+  next();
+};
 
-module.exports = { isLoggedIn, isAdmin, isDoctor };
+const isPatient = (req, res, next) => {
+  if (req.user?.role !== "patient") {
+    return next(createError(403, "only patients are authorized to perform this action"));
+  }
+  next();
+};
+
+module.exports = { isLoggedIn, isAdmin, isDoctor, isPatient };

@@ -18,6 +18,11 @@ const appointmentSchema = new Schema(
       required: true,
       
     },
+    slotSnapshot: {
+      date: { type: Date, default: null },
+      startTime: { type: String, default: null, trim: true },
+      endTime: { type: String, default: null, trim: true },
+    },
     reason: {
       type: String,
       trim: true,

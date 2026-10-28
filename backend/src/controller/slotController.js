@@ -1,6 +1,7 @@
 const createError = require("http-errors");
 const { str, isObjectId } = require("../helper/validate");
 const Slot = require("../models/slotModel");
+const Appointment = require("../models/appointmentModel");
 const { successResponse } = require("./responseController");
 
 /**
@@ -52,9 +53,14 @@ const parseTimeToMinutes = (timeStr) => {
  * for the same doctor on the specified date.
  */
 const checkSlotOverlap = async (doctorId, normalizedDate, startMins, endMins, excludeSlotId = null) => {
+  const startOfDay = new Date(normalizedDate);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const endOfDay = new Date(normalizedDate);
+  endOfDay.setUTCHours(23, 59, 59, 999);
+
   const existingSlots = await Slot.find({
     doctor: doctorId,
-    date: normalizedDate,
+    date: { $gte: startOfDay, $lte: endOfDay },
     ...(excludeSlotId ? { _id: { $ne: excludeSlotId } } : {}),
   });
 
@@ -193,13 +199,35 @@ const updateSlot = async (req, res, next) => {
       throw createError(403, "unauthorized: you can only update your own slots");
     }
 
-    // Booked slot update protection
-    if (existingSlot.isBooked) {
+    // Prevent modifications that conflict with active bookings (pending or approved)
+    const activeAppointment = await Appointment.findOne({
+      slot: existingSlot._id,
+      status: { $in: ["pending", "approved"] },
+    });
+    if (activeAppointment) {
       throw createError(
         409,
-        "booked slots cannot be modified directly; please reschedule the appointment instead"
+        "Cannot modify or reschedule a slot with an active booking (pending or approved); please cancel or reschedule the appointment first"
       );
     }
+
+    // Preserve historical completed appointment records before modifying slot
+    await Appointment.updateMany(
+      {
+        slot: existingSlot._id,
+        status: "completed",
+        $or: [{ slotSnapshot: null }, { "slotSnapshot.date": null }],
+      },
+      {
+        $set: {
+          slotSnapshot: {
+            date: existingSlot.date,
+            startTime: existingSlot.startTime,
+            endTime: existingSlot.endTime,
+          },
+        },
+      }
+    );
 
     const { date, startTime, endTime, isBooked, capacity } = req.body;
     const updateData = {};
@@ -315,13 +343,35 @@ const deleteSlot = async (req, res, next) => {
       throw createError(403, "unauthorized: you can only delete your own slots");
     }
 
-    // Booked slot deletion protection
-    if (slot.isBooked) {
+    // Booked slot deletion protection: active bookings cannot be deleted directly
+    const activeAppointment = await Appointment.findOne({
+      slot: slot._id,
+      status: { $in: ["pending", "approved"] },
+    });
+    if (activeAppointment) {
       throw createError(
         409,
-        "booked slots cannot be deleted directly; please cancel or reschedule the appointment first"
+        "Cannot delete a slot with an active booking (pending or approved); please cancel the appointment first"
       );
     }
+
+    // Preserve historical completed appointment records before slot deletion
+    await Appointment.updateMany(
+      {
+        slot: slot._id,
+        status: "completed",
+        $or: [{ slotSnapshot: null }, { "slotSnapshot.date": null }],
+      },
+      {
+        $set: {
+          slotSnapshot: {
+            date: slot.date,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+          },
+        },
+      }
+    );
 
     await Slot.findByIdAndDelete(slot._id);
 

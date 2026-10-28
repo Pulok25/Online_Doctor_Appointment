@@ -113,6 +113,18 @@ const createPrescription = async (req, res, next) => {
     );
 
     // Atomically mark appointment as completed and link prescription
+    // Preserve historical slot snapshot
+    if (!appointment.slotSnapshot?.date && appointment.slot) {
+      const slotDoc = await Slot.findById(appointment.slot);
+      if (slotDoc) {
+        appointment.slotSnapshot = {
+          date: slotDoc.date,
+          startTime: slotDoc.startTime,
+          endTime: slotDoc.endTime,
+        };
+      }
+    }
+
     appointment.status = "completed";
     appointment.prescription = prescription._id;
     await appointment.save();

@@ -211,8 +211,15 @@ const downloadPrescriptionPdf = async (req, res, next) => {
       doc.registerFont("Bengali", bengaliFont);
       doc.registerFont("Bengali-Bold", bengaliFont);
     }
-    const fontRegular = bengaliFont ? "Bengali" : "Helvetica";
-    const fontBold = bengaliFont ? "Bengali-Bold" : "Helvetica-Bold";
+    const hasBengali = (text) => /[\u0980-\u09FF]/.test(String(text || ""));
+    const fontOf = (text, isBold = false) => {
+      if (bengaliFont && hasBengali(text)) {
+        return isBold ? "Bengali-Bold" : "Bengali";
+      }
+      return isBold ? "Helvetica-Bold" : "Helvetica";
+    };
+    const fontRegular = "Helvetica";
+    const fontBold = "Helvetica-Bold";
 
     doc.pipe(res);
 
@@ -356,17 +363,17 @@ const downloadPrescriptionPdf = async (req, res, next) => {
 
     // Line 1: Name & Age
     doc.font(fontBold).fontSize(8.5).fillColor("#64748b").text("PATIENT NAME:", 54, ptCardY + 9);
-    doc.font(fontBold).fontSize(9.5).fillColor("#0f172a").text(patientDisplayName, 135, ptCardY + 9);
+    doc.font(fontOf(patientDisplayName, true)).fontSize(9.5).fillColor("#0f172a").text(patientDisplayName, 135, ptCardY + 9, { width: 240 });
 
     doc.font(fontBold).fontSize(8.5).fillColor("#64748b").text("AGE / বয়স:", 380, ptCardY + 9);
-    doc.font(fontRegular).fontSize(9).fillColor("#0f172a").text(patientDisplayAge, 440, ptCardY + 9);
+    doc.font(fontOf(patientDisplayAge, false)).fontSize(9).fillColor("#0f172a").text(patientDisplayAge, 440, ptCardY + 9, { width: 100 });
 
     // Line 2: Gender & Contact
     doc.font(fontBold).fontSize(8.5).fillColor("#64748b").text("GENDER / লিঙ্গ:", 54, ptCardY + 26);
-    doc.font(fontRegular).fontSize(9).fillColor("#0f172a").text(patientDisplayGender, 135, ptCardY + 26);
+    doc.font(fontOf(patientDisplayGender, false)).fontSize(9).fillColor("#0f172a").text(patientDisplayGender, 135, ptCardY + 26, { width: 110 });
 
     doc.font(fontBold).fontSize(8.5).fillColor("#64748b").text("PHONE / মোবাইল:", 250, ptCardY + 26);
-    doc.font(fontRegular).fontSize(9).fillColor("#0f172a").text(prescription.patient?.phone || "N/A", 345, ptCardY + 26);
+    doc.font(fontRegular).fontSize(9).fillColor("#0f172a").text(prescription.patient?.phone || "N/A", 345, ptCardY + 26, { width: 190 });
 
     // ==========================================
     // 6. CLINICAL DIAGNOSIS BANNER
@@ -380,10 +387,10 @@ const downloadPrescriptionPdf = async (req, res, next) => {
        .fillColor("#0f766e")
        .text("DIAGNOSIS / লক্ষণ ও রোগ নির্ণয়:", 54, diagY + 8);
 
-    doc.font(fontRegular)
-       .fontSize(9.5)
+    doc.font(fontOf(prescription.diagnosis, false))
+       .fontSize(9)
        .fillColor("#134e4a")
-       .text(prescription.diagnosis, 220, diagY + 8);
+       .text(prescription.diagnosis || "", 220, diagY + 8, { width: 325 });
 
     // ==========================================
     // 7. Rx SYMBOL & MEDICINES SECTION
@@ -398,21 +405,30 @@ const downloadPrescriptionPdf = async (req, res, next) => {
     const tblY = rxY + 30;
     doc.roundedRect(42, tblY, 511, 22, 4).fill("#f1f5f9");
     doc.fillColor("#334155").font(fontBold).fontSize(8.5);
-    doc.text("#", 52, tblY + 6);
-    doc.text("MEDICINE NAME (ওষুধের নাম)", 75, tblY + 6);
-    doc.text("DOSAGE / FREQUENCY (সেবনবিধি)", 270, tblY + 6);
-    doc.text("DURATION (সময়কাল)", 445, tblY + 6);
+    doc.text("#", 50, tblY + 6, { width: 20 });
+    doc.text("MEDICINE NAME (ওষুধের নাম)", 72, tblY + 6, { width: 195 });
+    doc.text("DOSAGE / FREQUENCY (সেবনবিধি)", 272, tblY + 6, { width: 168 });
+    doc.text("DURATION (সময়কাল)", 445, tblY + 6, { width: 100 });
 
     // Medicine Rows
     let curY = tblY + 24;
     prescription.medicines.forEach((med, index) => {
-      doc.font(fontBold).fontSize(8.5).fillColor("#0f766e").text(`${index + 1}.`, 52, curY + 6);
-      doc.font(fontBold).fontSize(9).fillColor("#0f172a").text(med.name, 75, curY + 6);
-      doc.font(fontRegular).fontSize(8.5).fillColor("#334155").text(med.dosage, 270, curY + 6);
-      doc.font(fontRegular).fontSize(8.5).fillColor("#334155").text(med.duration, 445, curY + 6);
+      const nameFont = fontOf(med.name, true);
+      const dosageFont = fontOf(med.dosage, false);
+      const durationFont = fontOf(med.duration, false);
 
-      curY += 24;
-      doc.strokeColor("#f1f5f9").lineWidth(0.8).moveTo(42, curY).lineTo(553, curY).stroke();
+      const nameH = doc.font(nameFont).fontSize(8.5).heightOfString(med.name || "", { width: 195 });
+      const dosageH = doc.font(dosageFont).fontSize(8.5).heightOfString(med.dosage || "", { width: 168 });
+      const durationH = doc.font(durationFont).fontSize(8.5).heightOfString(med.duration || "", { width: 100 });
+      const rowH = Math.max(22, nameH + 8, dosageH + 8, durationH + 8);
+
+      doc.font(fontBold).fontSize(8.5).fillColor("#0f766e").text(`${index + 1}.`, 50, curY + 4, { width: 20 });
+      doc.font(nameFont).fontSize(8.5).fillColor("#0f172a").text(med.name || "", 72, curY + 4, { width: 195 });
+      doc.font(dosageFont).fontSize(8.5).fillColor("#334155").text(med.dosage || "", 272, curY + 4, { width: 168 });
+      doc.font(durationFont).fontSize(8.5).fillColor("#334155").text(med.duration || "", 445, curY + 4, { width: 100 });
+
+      curY += rowH;
+      doc.strokeColor("#e2e8f0").lineWidth(0.5).moveTo(42, curY).lineTo(553, curY).stroke();
     });
 
     // ==========================================
@@ -431,7 +447,7 @@ const downloadPrescriptionPdf = async (req, res, next) => {
 
       let tY = curY + 24;
       prescription.tests.forEach((testItem, idx) => {
-        doc.font(fontRegular).fontSize(8.5).fillColor("#14532d").text(`${idx + 1}. ${testItem}`, 54, tY);
+        doc.font(fontOf(testItem, false)).fontSize(8.5).fillColor("#14532d").text(`${idx + 1}. ${testItem}`, 54, tY, { width: 485 });
         tY += 16;
       });
       curY += testBoxH;
@@ -441,8 +457,12 @@ const downloadPrescriptionPdf = async (req, res, next) => {
     // 9. ADVICE / INSTRUCTIONS
     // ==========================================
     if (prescription.notes) {
-      curY += 10;
-      doc.roundedRect(42, curY, 511, 46, 6)
+      curY += 8;
+      const notesFont = fontOf(prescription.notes, false);
+      const notesH = doc.font(notesFont).fontSize(8.5).heightOfString(prescription.notes, { width: 485, lineGap: 2 });
+      const boxH = Math.max(46, notesH + 28);
+
+      doc.roundedRect(42, curY, 511, boxH, 6)
          .fillAndStroke("#f8fafc", "#e2e8f0");
 
       doc.font(fontBold)
@@ -450,20 +470,20 @@ const downloadPrescriptionPdf = async (req, res, next) => {
          .fillColor("#0f766e")
          .text("ADVICE & CLINICAL INSTRUCTIONS / চিকিৎসকের পরামর্শ:", 54, curY + 8);
 
-      doc.font(fontRegular)
+      doc.font(notesFont)
          .fontSize(8.5)
          .fillColor("#334155")
-         .text(prescription.notes, 54, curY + 23, {
+         .text(prescription.notes, 54, curY + 21, {
            width: 485,
            lineGap: 2,
          });
-      curY += 56;
+      curY += boxH;
     }
 
     // ==========================================
     // 10. SIGNATURE LINE & DIGITAL SEAL
     // ==========================================
-    const signY = Math.max(curY + 25, 700);
+    const signY = Math.min(Math.max(curY + 15, 680), 730);
 
     // Doctor signature line
     doc.strokeColor("#94a3b8").lineWidth(1).moveTo(380, signY).lineTo(540, signY).stroke();
@@ -476,8 +496,10 @@ const downloadPrescriptionPdf = async (req, res, next) => {
     doc.font(fontRegular).fontSize(7).fillColor("#047857").text("Verified via DocSheba Healthcare Network", 50, signY + 12);
 
     // ==========================================
-    // 11. MODERN CURVED FOOTER WAVES
+    // 11. MODERN CURVED FOOTER WAVES (SINGLE PAGE GUARANTEED)
     // ==========================================
+    doc.page.margins.bottom = 0;
+
     doc.save();
     doc.moveTo(0, 842)
        .lineTo(595, 842)
@@ -498,12 +520,12 @@ const downloadPrescriptionPdf = async (req, res, next) => {
     doc.font(fontBold)
        .fontSize(8.5)
        .fillColor("#ffffff")
-       .text("DocSheba Medical Center · 24/7 Digital Outpatient Clinic & Diagnostics", 0, 805, { align: "center", width: 595 });
+       .text("DocSheba Medical Center · 24/7 Digital Outpatient Clinic & Diagnostics", 0, 798, { align: "center", width: 595, lineBreak: false });
 
     doc.font(fontRegular)
        .fontSize(7.5)
        .fillColor("#ccfbf1")
-       .text("Hotline: +880 1700-000000 · Support: support@docsheba.com · Valid for 30 days from issue", 0, 819, { align: "center", width: 595 });
+       .text("Hotline: +880 1700-000000 · Support: support@docsheba.com · Valid for 30 days from issue", 0, 812, { align: "center", width: 595, lineBreak: false });
 
     doc.end();
   } catch (error) {

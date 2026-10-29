@@ -23,7 +23,13 @@ const bookAppointment = async (req, res, next) => {
     const { slotId, reason } = req.body;
 
     if (req.user?.role !== "patient") {
-      throw CreateError(403, "Only authenticated patients can book appointments");
+      throw CreateError(403, "Doctors and admins cannot book appointments. Only patients can book appointments.");
+    }
+
+    // Prevent doctor-to-doctor booking: user cannot have a registered doctor profile
+    const isDoctorProfile = await DoctorProfile.exists({ user: req.user._id });
+    if (isDoctorProfile) {
+      throw CreateError(403, "Doctor-to-doctor booking is prohibited. Doctors cannot book appointments with doctors.");
     }
 
     if (!isObjectId(slotId)) {

@@ -103,8 +103,13 @@ export default function DoctorList() {
       return;
     }
 
+    if (user.role === "doctor" || user.role === "admin") {
+      alert("Doctor-to-doctor booking is prohibited. Doctors cannot book appointments with doctors.");
+      return;
+    }
+
     if (user.role !== "patient") {
-      setBookingError("Only authenticated patients can book appointments. Doctor and admin accounts cannot book.");
+      alert("Only authenticated patients are authorized to book appointments.");
       return;
     }
 
@@ -133,6 +138,10 @@ export default function DoctorList() {
   };
 
   const handleBook = async () => {
+    if (user?.role === "doctor" || user?.role === "admin") {
+      setBookingError("Doctor-to-doctor booking is prohibited. Doctors cannot book appointments.");
+      return;
+    }
     if (user?.role !== "patient") {
       setBookingError("Only authenticated patients are authorized to book appointments");
       return;
@@ -353,12 +362,19 @@ export default function DoctorList() {
                     </span>
                   </div>
 
-                  {user && user.role !== "patient" ? (
+                  {user && (doc.user?._id === user._id || doc.user === user._id) ? (
                     <span
-                      title="Only authenticated patients can book appointments"
-                      className="px-3 py-2 bg-slate-100 text-slate-400 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-200"
+                      title="This is your own doctor profile"
+                      className="px-3 py-2 bg-teal-50 text-teal-700 rounded-xl text-xs font-semibold border border-teal-200"
                     >
-                      Patients Only
+                      Your Profile
+                    </span>
+                  ) : user && (user.role === "doctor" || user.role === "admin") ? (
+                    <span
+                      title="Doctors and admins cannot book appointments with doctors"
+                      className="px-3 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-200"
+                    >
+                      {user.role === "doctor" ? "Doctors Cannot Book" : "Admin Account"}
                     </span>
                   ) : (
                     <motion.button

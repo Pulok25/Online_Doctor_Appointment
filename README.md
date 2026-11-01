@@ -1,4 +1,4 @@
-# Online Doctor Appointment and Patient Management System
+# Docsheba: Online Doctor Appointment and Patient Management System
 
 A MERN-stack web application for booking doctor appointments, with role-based access for patients, doctors, and admins. Built as a final-year portfolio project.
 

@@ -12,6 +12,7 @@ import {
   Stethoscope,
   ShieldCheck,
   Calendar,
+  MessageSquare,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -120,6 +121,34 @@ export default function Navbar() {
                 Join as Doctor
               </Link>
             )}
+
+            {user?.role === "patient" && (
+              <Link
+                to="/patient/complaints"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive("/patient/complaints")
+                    ? "bg-rose-50 text-rose-700 font-semibold"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 text-rose-500" />
+                Complaints
+              </Link>
+            )}
+
+            {user?.role === "admin" && (
+              <Link
+                to="/admin/complaints"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive("/admin/complaints")
+                    ? "bg-rose-50 text-rose-700 font-semibold"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 text-rose-500" />
+                Complaints
+              </Link>
+            )}
           </nav>
 
           {/* Desktop Auth / User Info */}
@@ -224,6 +253,28 @@ export default function Navbar() {
             >
               <Stethoscope className="w-4 h-4 text-teal-600" />
               Apply as Doctor
+            </Link>
+          )}
+
+          {user?.role === "patient" && (
+            <Link
+              to="/patient/complaints"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-base font-medium text-slate-700 hover:bg-rose-50 hover:text-rose-700"
+            >
+              <MessageSquare className="w-4 h-4 text-rose-500" />
+              Complaints
+            </Link>
+          )}
+
+          {user?.role === "admin" && (
+            <Link
+              to="/admin/complaints"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-base font-medium text-slate-700 hover:bg-rose-50 hover:text-rose-700"
+            >
+              <MessageSquare className="w-4 h-4 text-rose-500" />
+              Complaints
             </Link>
           )}
 

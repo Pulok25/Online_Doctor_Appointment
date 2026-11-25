@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axiosInstance, { BACKEND_URL } from "../api/axiosInstance";
+import { Link } from "react-router";
 import {
   ShieldCheck,
   Check,
@@ -25,6 +26,7 @@ import {
   Download,
   Receipt,
   CreditCard,
+  MessageSquare,
 } from "lucide-react";
 
 export default function AdminApplications() {
@@ -331,6 +333,13 @@ export default function AdminApplications() {
               <Stethoscope className="w-4 h-4 text-purple-600" />
               <span>Doctor Verification</span>
             </button>
+            <Link
+              to="/admin/complaints"
+              className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900"
+            >
+              <MessageSquare className="w-4 h-4 text-rose-500" />
+              <span>Patient Complaints</span>
+            </Link>
           </div>
         </div>
       </div>

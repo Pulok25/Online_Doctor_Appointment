@@ -7,6 +7,8 @@ import DoctorDashboard from "../pages/DoctorDashboard";
 import AdminApplications from "../pages/AdminApplications";
 import DoctorList from "../pages/DoctorList";
 import ApplyDoctor from "../pages/ApplyDoctor";
+import PatientComplaints from "../pages/PatientComplaints";
+import AdminComplaints from "../pages/AdminComplaints";
 import ProtectedRoute from "./ProtectedRoute";
 
 export default function AppRoutes() {
@@ -46,6 +48,23 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["patient"]}>
             <ApplyDoctor />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/patient/complaints"
+        element={
+          <ProtectedRoute allowedRoles={["patient"]}>
+            <PatientComplaints />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/complaints"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminComplaints />
           </ProtectedRoute>
         }
       />

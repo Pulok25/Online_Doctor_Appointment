@@ -12,6 +12,7 @@ const doctorRouter = require("./router/doctorRouter");
 const slotRouter = require("./router/slotRouter");
 const appointmentRouter = require("./router/appointmentRouter");
 const prescriptionRouter = require("./router/prescriptionRouter");
+const complaintRouter = require("./router/complaintRouter");
 
 
 
@@ -49,6 +50,7 @@ app.use('/api/doctors', doctorRouter)
 app.use("/api/slots", slotRouter)
 app.use("/api/appointments", appointmentRouter)
 app.use("/api/prescriptions", prescriptionRouter)
+app.use("/api/complaints", complaintRouter)
 
 // 404 handler
 app.use((req, res, next) => {

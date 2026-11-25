@@ -38,6 +38,13 @@ const createComplaint = async (req, res, next) => {
       payload: { complaint },
     });
   } catch (error) {
+    if (error.name === "ValidationError") {
+      const firstMsg = Object.values(error.errors)[0]?.message || error.message;
+      return next(createError(400, firstMsg));
+    }
+    if (error.name === "CastError") {
+      return next(createError(400, "Invalid ID format"));
+    }
     next(error);
   }
 };

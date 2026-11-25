@@ -88,13 +88,18 @@ const complaintSchema = new Schema(
   { timestamps: true }
 );
 
-// Auto-generate a unique complaint reference ID before save
-complaintSchema.pre("save", async function (next) {
-  if (this.referenceId) return next();
-  const count = await this.constructor.countDocuments();
+// Auto-generate a unique complaint reference ID before save (Mongoose 9 async hook)
+complaintSchema.pre("save", async function () {
+  if (this.referenceId) return;
   const year = new Date().getFullYear();
-  this.referenceId = `CMP-${year}-${String(count + 1).padStart(5, "0")}`;
-  next();
+  const count = await this.constructor.countDocuments();
+  let seq = count + 1;
+  let candidate = `CMP-${year}-${String(seq).padStart(5, "0")}`;
+  while (await this.constructor.exists({ referenceId: candidate })) {
+    seq += 1;
+    candidate = `CMP-${year}-${String(seq).padStart(5, "0")}`;
+  }
+  this.referenceId = candidate;
 });
 
 module.exports = model("Complaint", complaintSchema);
